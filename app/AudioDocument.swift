@@ -10,12 +10,13 @@ final class AudioDocument: NSObject, WorkspaceDocument, AVAudioPlayerDelegate {
     let timeline = NSSlider()
     private let clock = label("",12,Ink.muted)
     private(set) var player: AVAudioPlayer?
-    private(set) var status = "音频预览"
+    var status: String { L(statusKey) }
+    private var statusKey = "Audio Preview"
     private var revision: FileRevision?
     private var timer: Timer?
     private var visible = true
     private var resumeTime: TimeInterval = 0
-    lazy var playback = ActionButton("播放","play.fill") { [weak self] in self?.togglePlayback() }
+    lazy var playback = ActionButton(L("Play"),"play.fill") { [weak self] in self?.togglePlayback() }
 
     init(_ url:URL) throws {
         location = url
@@ -23,7 +24,6 @@ final class AudioDocument: NSObject, WorkspaceDocument, AVAudioPlayerDelegate {
         timeline.isContinuous = true
         timeline.minValue = 0
         timeline.target = self; timeline.action = #selector(seek)
-        timeline.setAccessibilityLabel("播放进度")
         let bar = stack(.horizontal,[playback,timeline,clock],12)
         let column = stack(.vertical,[glyph("music.note",Ink.accent,32),label(title,18,Ink.text,.medium),bar],16)
         column.alignment = .centerX
@@ -46,7 +46,7 @@ final class AudioDocument: NSObject, WorkspaceDocument, AVAudioPlayerDelegate {
         replacement.delegate = self
         replacement.currentTime = min(position,replacement.duration)
         player = replacement; revision = current
-        status = "音频预览"; refresh()
+        statusKey = "Audio Preview"; refresh()
     }
     func hide() {
         guard visible else { return }
@@ -58,12 +58,14 @@ final class AudioDocument: NSObject, WorkspaceDocument, AVAudioPlayerDelegate {
     func show() {
         visible = true
         reconcile()
+        timeline.setAccessibilityLabel(L("Playback position"))
+        refresh()
     }
     func reconcile() {
         do { try reload() }
         catch {
             pause(); player = nil; revision = nil
-            status = FileManager.default.fileExists(atPath:location.path) ? "音频无法读取" : "音频已移除"
+            statusKey = FileManager.default.fileExists(atPath:location.path) ? "Unable to read audio" : "Audio removed"
             refresh()
         }
     }
@@ -87,7 +89,8 @@ final class AudioDocument: NSObject, WorkspaceDocument, AVAudioPlayerDelegate {
     }
     private func refresh() {
         let playing = player?.isPlaying == true
-        playback.title = playing ? "暂停" : "播放"
+        playback.title = playing ? L("Pause") : L("Play")
+        playback.toolTip = playback.title
         playback.setAccessibilityLabel(playback.title)
         playback.image = symbol(playing ? "pause.fill" : "play.fill")
         playback.isEnabled = player != nil; timeline.isEnabled = player != nil

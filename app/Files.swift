@@ -24,9 +24,9 @@ enum FileProblem: LocalizedError {
     case unsupported, large, conflict
     var errorDescription: String? {
         switch self {
-        case .unsupported: return "此文件不是支持的 UTF-8 或 UTF-16 文本。"
-        case .large: return "此版本的编辑上限为每个文件 32 MB。"
-        case .conflict: return "磁盘内容已变化，请先处理外部修改。"
+        case .unsupported: return L("This file is not supported UTF-8 or UTF-16 text.")
+        case .large: return L("Files must be 32 MB or smaller to edit.")
+        case .conflict: return L("The file changed on disk. Resolve the external changes first.")
         }
     }
 }

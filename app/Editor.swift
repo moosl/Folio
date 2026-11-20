@@ -99,7 +99,8 @@ private final class EditorViews {
 enum ReadMode: Int { case source, split, preview }
 final class Buffer: NSObject, NSTextViewDelegate, NSTextStorageDelegate, WorkspaceDocument {
     var url: URL?
-    let untitled: String
+    private let untitledNumber: Int
+    var untitled: String { untitledNumber <= 1 ? L("Untitled") : L("Untitled %ld",untitledNumber) }
     var title: String { url?.lastPathComponent ?? untitled }
     var markdown: Bool { ["md","markdown","mdown","mkd"].contains(url?.pathExtension.lowercased() ?? "") }
     private var editor: EditorViews?
@@ -136,9 +137,9 @@ final class Buffer: NSObject, NSTextViewDelegate, NSTextStorageDelegate, Workspa
         (#"(?m)//[^\n]*|/\*[\s\S]*?\*/"#,dual(0xa3998c,0x847a70))
     ].map { (try! NSRegularExpression(pattern:$0.0),$0.1) }
 
-    init(url: URL?, name: String, file: TextFile) {
+    init(url: URL?, untitledNumber: Int = 1, file: TextFile) {
         self.url = url
-        self.untitled = name
+        self.untitledNumber = untitledNumber
         self.file = file
         baseline = url == nil ? nil : file.digest
         lastChecked = file.revision

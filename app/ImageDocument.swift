@@ -29,7 +29,8 @@ final class ImageDocument: WorkspaceDocument {
     let dirty = false
     let view = FittedImageView()
     private(set) var dimensions = ""
-    private(set) var status = "图片预览"
+    var status: String { L(statusKey) }
+    private var statusKey = "Image Preview"
     private var revision: FileRevision?
     private var pixels = NSSize.zero
     private var nativeSize = NSSize.zero
@@ -126,14 +127,14 @@ final class ImageDocument: WorkspaceDocument {
         // Preserve the native representations for animated images, SVG and small rasters.
         if (visible || pixels == .zero) && image == nil {
             guard let original = NSImage(contentsOf:location), original.isValid else {
-                throw NSError(domain:"Folio.Image",code:1,userInfo:[NSLocalizedDescriptionKey:"无法读取这张图片，文件可能已损坏或格式不受支持。"])
+                throw NSError(domain:"Folio.Image",code:1,userInfo:[NSLocalizedDescriptionKey:L("Unable to read this image. It may be damaged or in an unsupported format.")])
             }
             if pixels == .zero { pixels = original.size }
             if visible { image = original }
         }
         view.image = image
         dimensions = "\(Int(pixels.width.rounded())) × \(Int(pixels.height.rounded()))"
-        status = "图片预览"
+        statusKey = "Image Preview"
         revision = current
     }
 
@@ -142,7 +143,7 @@ final class ImageDocument: WorkspaceDocument {
         catch {
             view.image = nil; revision = nil; decodedLimit = 0
             dimensions = ""
-            status = FileManager.default.fileExists(atPath:location.path) ? "图片无法读取" : "图片已移除"
+            statusKey = FileManager.default.fileExists(atPath:location.path) ? "Unable to read image" : "Image removed"
         }
     }
 }

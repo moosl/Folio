@@ -96,6 +96,9 @@ if [[ ! -f "$icon_cache" ]]; then
 fi
 cp "$icon_cache" "$app/Resources/FolioAppIcon.icns"
 cp app/Resources/Assets.car "$app/Resources/"
+for localization in app/Resources/*.lproj; do
+  ditto "$localization" "$app/Resources/$(basename "$localization")"
+done
 if [[ -f "$app/Resources/Folio.icns" ]]; then unlink "$app/Resources/Folio.icns"; fi
 cp app/Resources/FolderBox{,Dark}.svg "$app/Resources/"
 cp app/Info.plist "$app/Info.plist"

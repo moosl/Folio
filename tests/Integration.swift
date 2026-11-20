@@ -51,7 +51,7 @@ func capture(_ w:NSWindow,_ path:URL) {
 func runIntegration(_ e:Workspace) {
     setlinebuf(stdout)
     checkSplitAppIcon()
-    let update = NSApp.mainMenu?.items.first?.submenu?.item(withTitle:"检查更新…")
+    let update = NSApp.mainMenu?.items.first?.submenu?.item(withTitle:L("Check for Updates…"))
     check(update?.target is SPUStandardUpdaterController && update?.action == #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
           "application menu checks for updates through Sparkle")
 
@@ -116,7 +116,7 @@ func runIntegration(_ e:Workspace) {
         for url in [tmp,file("Design"),file("README.md")] {
             let path = url.resolvingSymlinksInPath().path
             let index = e.items.firstIndex { $0.0.path == path }!
-            let copy = e.tree.table.contextMenuForRow?(index)?.item(withTitle:"复制文件路径")
+            let copy = e.tree.table.contextMenuForRow?(index)?.item(withTitle:L("Copy File Path"))
             check((copy?.representedObject as? URL)?.path == path && copy?.target === e &&
                   copy?.action == NSSelectorFromString("copyTreePath:"),
                   "copy path targets the clicked tree item: " + url.lastPathComponent)
@@ -161,6 +161,46 @@ func runIntegration(_ e:Workspace) {
         blank.source.insertText("    func example()",replacementRange:NSRange(location:0,length:0))
         blank.source.insertNewline(nil)
         check(blank.source.string.hasSuffix("\n    ") && blank.dirty,"native text input, indentation and dirty state")
+        check(AppLanguage.resolve(.system,preferred:["sv-SE","nl-NL"]) == .english &&
+              AppLanguage.resolve(.system,preferred:["zh-CN"]) == .simplifiedChinese &&
+              AppLanguage.resolve(.system,preferred:["sv-SE","zh-TW"]) == .traditionalChinese &&
+              AppLanguage.resolve(.system,preferred:["fr-CA","ja-JP"]) == .french &&
+              AppLanguage.resolve(.system,preferred:["pt-BR"]) == .portuguese,
+              "system language matching and English fallback")
+        let originalLanguage = Localization.choice
+        let selection = blank.source.selectedRange()
+        func pickLanguage(_ choice: AppLanguage) {
+            let appMenu = NSApp.mainMenu!.items[0].submenu!
+            let settings = appMenu.items[0]
+            check(settings.title == L("Language Settings") && appMenu.items[1].action == #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+                  "language settings immediately precede Check for Updates")
+            let options = settings.submenu!
+            let index = options.items.firstIndex { ($0.representedObject as? String) == choice.rawValue }!
+            options.performActionForItem(at:index)
+            let refreshed = NSApp.mainMenu!.items[0].submenu!.items[0].submenu!
+            check(Localization.choice == choice && refreshed.items[index].state == .on,
+                  "language menu saves and marks the selected preference")
+        }
+        for (choice,title,unsaved) in [(AppLanguage.english,"Untitled","Unsaved"),(.traditionalChinese,"未命名","尚未儲存"),(.simplifiedChinese,"未命名","未保存")] {
+            pickLanguage(choice)
+            check(e.active === blank && blank.dirty && blank.title == title && e.status.stringValue == unsaved &&
+                  blank.source.selectedRange() == selection && blank.source.string.hasSuffix("\n    "),
+                  "switching languages relabels the open document and preserves its edits and selection")
+        }
+        for (choice,caption) in [(AppLanguage.japanese,"プロジェクト"),(.korean,"프로젝트"),(.french,"Projets"),
+                                 (.german,"Projekte"),(.spanish,"Proyectos"),(.portuguese,"Projetos"),
+                                 (.italian,"Progetti"),(.russian,"Проекты")] {
+            pickLanguage(choice)
+            check(e.treeCaption.stringValue == caption && L("Unsaved") != "Unsaved","localized project heading and status in "+choice.rawValue)
+        }
+        e.showQuickOpen()
+        e.searchField!.stringValue = "utils"
+        pickLanguage(.english)
+        check(e.page == .quick && e.searchField?.stringValue == "utils" && e.treeCaption.stringValue == "Projects",
+              "language switch preserves the search query and refreshes sidebar labels")
+        pickLanguage(.system)
+        if originalLanguage != .system { pickLanguage(originalLanguage) }
+        e.showEditor(blank)
         e.folder = file("Notes")
         let newURL = file("Notes/未命名.txt")
         try blank.save(to:newURL,expected:nil)
@@ -237,7 +277,7 @@ func runIntegration(_ e:Workspace) {
             e.newBuffer()
             let disposable = e.active!
             e.showEditor(source)
-            let close = e.tabViews[ObjectIdentifier(disposable)]!.nameButton.superview!.subviews.compactMap { $0 as? ActionButton }.first { $0.toolTip == "关闭 "+disposable.title }!
+            let close = e.tabViews[ObjectIdentifier(disposable)]!.nameButton.superview!.subviews.compactMap { $0 as? ActionButton }.first { $0.toolTip == L("Close %@",disposable.title) }!
             let rect = close.convert(close.bounds,to:nil)
             let point = NSPoint(x:rect.midX + (offset == 0 ? 0 : 12),y:rect.midY+CGFloat(offset))
             func clickEvent(_ type:NSEvent.EventType) -> NSEvent {
@@ -364,6 +404,19 @@ func runIntegration(_ e:Workspace) {
             return rep.representation(using:type,properties:[:])!
         }
         let imageURL = file("picture.png")
+        for (name,data) in [("archive.zip",Data([0x50,0x4b,0,0])),("unknown.folio-fixture",Data([0,255,1])),
+                            ("sample.pdf",Data("%PDF-1.4\n%%EOF".utf8))] {
+            try data.write(to:file(name))
+            e.showBrowse(tmp)
+            check(spin { e.items.contains { $0.0.lastPathComponent == name } },"unsupported file appears in sidebar")
+            e.selectTree(e.items.firstIndex { $0.0.lastPathComponent == name }!)
+            let column = e.body.subviews.first?.subviews.first as? NSStackView
+            let icon = column?.arrangedSubviews.first as? NSImageView
+            let title = column?.arrangedSubviews.last as? NSTextField
+            check(e.active is FileIconDocument && e.previewTab === e.active && icon?.image != nil &&
+                  (icon?.bounds.width ?? 0) >= 128 && title?.stringValue == name && !e.saveActive(),
+                  "sidebar opens read-only icon and filename for "+name)
+        }
         let firstImage = bitmap(36)
         try firstImage.write(to:imageURL)
         e.showBrowse(tmp)
@@ -382,7 +435,7 @@ func runIntegration(_ e:Workspace) {
         try bitmap(65).write(to:imageURL,options:.atomic)
         check(spin { picture.dimensions == "65 × 20" && picture.view.image != nil },"image follows atomic replacement")
         try FileManager.default.moveItem(at:imageURL,to:file("moved.png"))
-        check(spin { picture.view.image == nil && e.status.stringValue == "图片已移除" },"missing image status")
+        check(spin { picture.view.image == nil && e.status.stringValue == L("Image removed") },"missing image status")
         try firstImage.write(to:imageURL,options:.atomic)
         check(spin { picture.dimensions == "36 × 20" && picture.view.image != nil },"preview recovers after image returns")
         for (suffix,data) in [("jpg",bitmap(42,.jpeg)),("gif",bitmap(42,.gif)),("tiff",bitmap(42,.tiff))] {
@@ -439,7 +492,7 @@ func runIntegration(_ e:Workspace) {
         try write("index.html","<h1>Local page</h1>")
         e.open([file("index.html")])
         check(e.htmlURLForBrowser()?.path == file("index.html").path &&
-              e.editorActions.arrangedSubviews.contains { ($0 as? NSButton)?.title == "" && $0.toolTip == "在浏览器打开" },"HTML toolbar uses the original local URL")
+              e.editorActions.arrangedSubviews.contains { ($0 as? NSButton)?.title == "" && $0.toolTip == L("Open in Browser") },"HTML toolbar uses the original local URL")
         let html = e.active as! Buffer
         html.source.insertText("!",replacementRange:NSRange(location:0,length:0))
         check(e.saveActive() && (try? String(contentsOf:file("index.html")))?.hasPrefix("!") == true,"HTML still saves normally")
@@ -499,8 +552,8 @@ func runIntegration(_ e:Workspace) {
         moveSidebar(-70); check(abs(e.rail.bounds.width-originalWidth+20)<2,"sidebar divider drags left")
         let parentIndex = e.items.firstIndex { $0.0.path == other.path && $0.1 == 0 }!
         let rootMenu = e.treeMenu(for:parentIndex)!
-        check(rootMenu.items.map(\.title).contains("删除项目…"),"root context menu offers project deletion")
-        let deletion = rootMenu.item(withTitle:"删除项目…")!
+        check(rootMenu.items.map(\.title).contains(L("Delete Project")),"root context menu offers project deletion")
+        let deletion = rootMenu.item(withTitle:L("Delete Project"))!
         let cancel = Timer(timeInterval:0.12,repeats:true) { timer in
             guard NSApp.modalWindow != nil else { return }
             timer.invalidate(); NSApp.stopModal(withCode:.alertFirstButtonReturn)
@@ -508,7 +561,7 @@ func runIntegration(_ e:Workspace) {
         RunLoop.main.add(cancel,forMode:.modalPanel)
         NSApp.sendAction(deletion.action!,to:deletion.target,from:deletion)
         check(e.roots.contains { $0.path == other.path } && FileManager.default.fileExists(atPath:secondFile.path),"cancelling delete leaves the project on disk and in the tree")
-        let detach = rootMenu.item(withTitle:"移除项目")!
+        let detach = rootMenu.item(withTitle:L("Remove Project"))!
         NSApp.sendAction(detach.action!,to:detach.target,from:detach)
         check(!e.roots.contains { $0.path == other.path } && FileManager.default.fileExists(atPath:secondFile.path) && pending.dirty,
               "removing a project only detaches it from sidebar")
@@ -618,7 +671,7 @@ func runIntegration(_ e:Workspace) {
         cards.scrollToItems(at:[last],scrollPosition:.right)
         check(spin { cards.indexPathsForVisibleItems().contains(last) },"folder strip scrolls to offscreen directory")
         let lastTile = cards.item(at:last)!.view as! FolderTile
-        check((lastTile.menu?.item(withTitle:"新建文件…")?.representedObject as? URL)?.lastPathComponent == "folder-079",
+        check((lastTile.menu?.item(withTitle:L("New File"))?.representedObject as? URL)?.lastPathComponent == "folder-079",
               "reused overview card creates files in its current folder")
         check(lastTile.accessibilityPerformPress() && e.folder?.lastPathComponent == "folder-079","reused folder card opens the correct directory")
         // Close earlier temporary fixtures so the app can quit normally with a known session.
@@ -672,9 +725,9 @@ func runIntegration(_ e:Workspace) {
         check(e.docs.count == 3 && edited.dirty && e.previewTab?.title == "session-c.swift","editing a preview keeps its draft when another file opens")
         try edited.save(to:file("session-a.swift"),expected:edited.baseline)
         let notes = file("Notes")
-        let create = e.treeMenu(for:sessionRow("Notes"))!.item(withTitle:"新建文件…")!
-        check(e.treeMenu(for:sessionRow("session-a.swift"))!.item(withTitle:"新建文件…") == nil &&
-              e.treeMenu(for:e.items.firstIndex { $0.0.path == tmp.path }!)!.item(withTitle:"新建文件…") != nil,
+        let create = e.treeMenu(for:sessionRow("Notes"))!.item(withTitle:L("New File"))!
+        check(e.treeMenu(for:sessionRow("session-a.swift"))!.item(withTitle:L("New File")) == nil &&
+              e.treeMenu(for:e.items.firstIndex { $0.0.path == tmp.path }!)!.item(withTitle:L("New File")) != nil,
               "only folders and project roots offer file creation")
         func submitName(_ text:String,for item:NSMenuItem) {
             let enterName = Timer(timeInterval:0.08,repeats:true) { timer in
@@ -697,7 +750,7 @@ func runIntegration(_ e:Workspace) {
               e.items.contains { $0.0.path == e.active?.url?.path },"context action creates and opens the file in the clicked subfolder")
         do { try e.createItem(named:"session-a.swift",in:tmp,isFolder:false); check(false,"duplicate name rejected") }
         catch { check((try? String(contentsOf:file("session-a.swift")))?.hasPrefix("// note") == true,"file creation never overwrites a namesake") }
-        let folderAction = e.treeMenu(for:sessionRow("Notes"))!.item(withTitle:"新建文件夹…")!
+        let folderAction = e.treeMenu(for:sessionRow("Notes"))!.item(withTitle:L("New Folder"))!
         submitName("子目录",for:folderAction)
         let nested = notes.appendingPathComponent("子目录",isDirectory:true)
         check(isFolder(nested) && e.folder?.path == nested.path && e.items.contains { $0.0.path == nested.path },
@@ -706,9 +759,9 @@ func runIntegration(_ e:Workspace) {
             do { try e.createItem(named:invalid,in:notes,isFolder:true); check(false,"invalid or duplicate folder rejected") }
             catch { check(isFolder(nested),"invalid or duplicate folder leaves the existing directory intact") }
         }
-        check((lastTile.menu?.item(withTitle:"新建文件夹…")?.representedObject as? URL)?.lastPathComponent == "folder-079" &&
-              e.treeMenu(for:sessionRow("session-a.swift"))!.item(withTitle:"新建文件夹…") == nil &&
-              e.treeMenu(for:e.items.firstIndex { $0.0.path == tmp.path }!)!.item(withTitle:"新建文件夹…") != nil,
+        check((lastTile.menu?.item(withTitle:L("New Folder"))?.representedObject as? URL)?.lastPathComponent == "folder-079" &&
+              e.treeMenu(for:sessionRow("session-a.swift"))!.item(withTitle:L("New Folder")) == nil &&
+              e.treeMenu(for:e.items.firstIndex { $0.0.path == tmp.path }!)!.item(withTitle:L("New Folder")) != nil,
               "root and overview folders also offer subfolder creation")
         e.open([file("session-gone.swift")])
         e.showEditor(e.docs.first { $0.title == "session-b.swift" }!)

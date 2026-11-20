@@ -22,6 +22,8 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         updates.startUpdater()
         #endif
         menus()
+        NotificationCenter.default.addObserver(self,selector:#selector(systemLanguageChanged),
+                                               name:NSLocale.currentLocaleDidChangeNotification,object:nil)
         editor.window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps:true)
         let paths = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }.map { URL(fileURLWithPath:$0) }
@@ -57,6 +59,19 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func quick() { editor.showQuickOpen() }
     @objc func preview() { editor.togglePreview() }
     @objc func browse() { editor.showBrowse(editor.folder) }
+    @objc func chooseLanguage(_ sender:NSMenuItem) {
+        guard let code = sender.representedObject as? String, let choice = AppLanguage(rawValue:code) else { return }
+        Localization.select(choice)
+        refreshLanguage()
+    }
+    @objc private func systemLanguageChanged() {
+        if Localization.choice == .system { refreshLanguage() }
+    }
+    private func refreshLanguage() {
+        let changed = Localization.refresh()
+        menus()
+        if changed { editor.refreshLanguage() }
+    }
     func validateMenuItem(_ menuItem:NSMenuItem) -> Bool {
         if [#selector(save), #selector(saveAs), #selector(largerType), #selector(smallerType)].contains(where:{ $0 == menuItem.action }) {
             return editor?.page == .edit && editor?.active is Buffer
@@ -75,39 +90,49 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return i
         }
         let app = menu("Folio")
+        let language = NSMenuItem(title:L("Language Settings"),action:nil,keyEquivalent:"")
+        app.addItem(language)
+        let options = NSMenu(title:language.title)
+        language.submenu = options
+        for choice in AppLanguage.allCases {
+            let option = item(options,choice.menuTitle,#selector(chooseLanguage(_:)),"",[],self)
+            option.representedObject = choice.rawValue
+            option.state = choice == Localization.choice ? .on : .off
+        }
         #if !FOLIO_STORE
-        _ = item(app,"检查更新…",#selector(SPUStandardUpdaterController.checkForUpdates(_:)),"",[],updates)
+        _ = item(app,L("Check for Updates…"),#selector(SPUStandardUpdaterController.checkForUpdates(_:)),"",[],updates)
         app.addItem(.separator())
         #endif
-        _ = item(app,"退出 Folio",#selector(NSApplication.terminate(_:)),"q")
-        let f = menu("文件")
-        _ = item(f,"新建文件",#selector(newDoc),"n",.command,self)
-        _ = item(f,"打开文件…",#selector(openFile),"o",.command,self)
-        _ = item(f,"打开项目…",#selector(openFolder),"o",[.command,.shift],self)
+        _ = item(app,L("Quit Folio"),#selector(NSApplication.terminate(_:)),"q")
+        let f = menu(L("File"))
+        _ = item(f,L("New File"),#selector(newDoc),"n",.command,self)
+        _ = item(f,L("Open File…"),#selector(openFile),"o",.command,self)
+        _ = item(f,L("Open Project…"),#selector(openFolder),"o",[.command,.shift],self)
         f.addItem(.separator())
-        _ = item(f,"保存",#selector(save),"s",.command,self)
-        _ = item(f,"另存为…",#selector(saveAs),"s",[.command,.shift],self)
-        _ = item(f,"关闭标签页",#selector(closeTab),"w",.command,self)
-        let e = menu("编辑")
-        for (name,sel,key) in [("撤销","undo:","z"),("重做","redo:","Z"),("剪切","cut:","x"),("复制","copy:","c"),("粘贴","paste:","v"),("全选","selectAll:","a")] {
+        _ = item(f,L("Save"),#selector(save),"s",.command,self)
+        _ = item(f,L("Save As…"),#selector(saveAs),"s",[.command,.shift],self)
+        _ = item(f,L("Close Tab"),#selector(closeTab),"w",.command,self)
+        let e = menu(L("Edit"))
+        for (name,sel,key) in [(L("Undo"),"undo:","z"),(L("Redo"),"redo:","Z"),(L("Cut"),"cut:","x"),(L("Copy"),"copy:","c"),(L("Paste"),"paste:","v"),(L("Select All"),"selectAll:","a")] {
             _ = item(e,name,NSSelectorFromString(sel),key.lowercased(),key=="Z" ? [.command,.shift] : .command)
         }
-        for (name,key,tag) in [("查找","f",NSTextFinder.Action.showFindInterface),("查找和替换","h",.showReplaceInterface)] {
+        for (name,key,tag) in [(L("Find"),"f",NSTextFinder.Action.showFindInterface),(L("Find and Replace"),"h",.showReplaceInterface)] {
             let i = item(e,name,#selector(NSTextView.performTextFinderAction(_:)),key,key=="h" ? [.command,.option] : .command); i.tag = tag.rawValue
         }
-        let v = menu("查看")
-        _ = item(v,"放大文字",#selector(largerType),"+",.command,self)
-        let equal = item(v,"放大文字",#selector(largerType),"=",.command,self)
+        let v = menu(L("View"))
+        _ = item(v,L("Increase Text Size"),#selector(largerType),"+",.command,self)
+        let equal = item(v,L("Increase Text Size"),#selector(largerType),"=",.command,self)
         equal.isHidden = true; equal.allowsKeyEquivalentWhenHidden = true
-        _ = item(v,"缩小文字",#selector(smallerType),"-",.command,self)
-        _ = item(v,"项目搜索",#selector(projectSearch),"f",[.command,.shift],self)
-        _ = item(v,"快速打开",#selector(quick),"p",.command,self)
-        _ = item(v,"Markdown 源码 / 预览",#selector(preview),"e",.command,self)
-        _ = item(v,"项目概览",#selector(browse),"1",.command,self)
-        let windows = menu("窗口")
+        _ = item(v,L("Decrease Text Size"),#selector(smallerType),"-",.command,self)
+        _ = item(v,L("Search Project"),#selector(projectSearch),"f",[.command,.shift],self)
+        _ = item(v,L("Quick Open"),#selector(quick),"p",.command,self)
+        _ = item(v,L("Markdown Source / Preview"),#selector(preview),"e",.command,self)
+        _ = item(v,L("Project Overview"),#selector(browse),"1",.command,self)
+        let windows = menu(L("Window"))
         NSApp.windowsMenu = windows
     }
 }
+Localization.refresh()
 let application = NSApplication.shared
 let delegate = Application()
 application.setActivationPolicy(.regular)

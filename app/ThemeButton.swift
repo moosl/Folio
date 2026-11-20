@@ -29,7 +29,7 @@ final class ThemeButton: NSButton {
     private var dark: Bool { effectiveAppearance.bestMatch(from:[.aqua,.darkAqua]) == .darkAqua }
     private func updateIcon() {
         image = symbol(dark ? "sun.max" : "moon",12)
-        let next = dark ? "切换到浅色模式" : "切换到深色模式"
+        let next = dark ? L("Switch to Light Mode") : L("Switch to Dark Mode")
         toolTip = next; setAccessibilityLabel(next)
     }
     @objc private func toggle() {

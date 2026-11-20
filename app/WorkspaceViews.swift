@@ -123,9 +123,11 @@ final class DocumentTab: NSView {
         if path != previousPath {
             nameButton.image = symbol(doc.url.map(fileIcon) ?? "doc")
             nameButton.toolTip = path; nameButton.setAccessibilityLabel(path)
-            let closeLabel = "关闭 "+doc.title
-            closeButton.toolTip = closeLabel; closeButton.setAccessibilityLabel(closeLabel)
             previousPath = path
+        }
+        let closeLabel = L("Close %@",doc.title)
+        if closeButton.toolTip != closeLabel {
+            closeButton.toolTip = closeLabel; closeButton.setAccessibilityLabel(closeLabel)
         }
         if selected != self.selected {
             self.selected = selected
@@ -145,7 +147,7 @@ final class SidebarResizeHandle: NSView {
     init(widthConstraint:NSLayoutConstraint) {
         self.widthConstraint = widthConstraint
         super.init(frame:.zero)
-        toolTip = "拖动调整侧栏宽度"
+        toolTip = L("Drag to resize the sidebar")
     }
     required init?(coder:NSCoder) { fatalError() }
     override var mouseDownCanMoveWindow: Bool { false }

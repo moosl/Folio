@@ -2,6 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>local.folio.editor</string>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleIconName</key><string>FolioAppIcon</string>
 <key>CFBundleIconFile</key><string>FolioAppIcon.icns</string>
 <key>SUFeedURL</key><string>https://github.com/moosl/Folio/releases/latest/download/appcast.xml</string>

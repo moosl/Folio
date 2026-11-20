@@ -15,7 +15,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     let rail = stack(.vertical), main = stack(.vertical)
     let body = surface(Ink.canvas), tree = RowList(rowHeight:28)
     let crumb = stack(.horizontal,[],9), railTitle = label("Folio",17,Ink.text,.semibold)
-    let tabs = TabBar(frame:.zero), treeCaption = label("项目文件",10,Ink.faint,.semibold)
+    let tabs = TabBar(frame:.zero), treeCaption = label(L("Projects"),10,Ink.faint,.semibold)
     let editorActions = stack(.horizontal,[],10)
     let status = label("",11,Ink.muted), rightStatus = label("",11,Ink.faint)
     let search = SearchService(), watches = FileWatches()
@@ -93,13 +93,28 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         if let doc = selected ?? docs.last { showEditor(doc) }
     }
 
-    func makeShell() {
+    func refreshLanguage() {
+        let width = rail.bounds.width
+        clear(rail); clear(main)
+        treeCaption.stringValue = L("Projects")
+        makeShell(sidebarWidth:width)
+        switch page {
+        case .edit:
+            sourceHost = nil
+            if let active { showEditor(active) }
+        case .browse: showBrowse(folder)
+        case .quick, .find:
+            let query = searchField?.stringValue ?? ""
+            showSearch(content:page == .find,query:query)
+        }
+    }
+    private func makeShell(sidebarWidth width:CGFloat = 232) {
         let host = DropView(frame:.zero)
         host.open = { [weak self] urls in self?.open(urls) }
         window.contentView = host
         railTitle.font = serif(17)
         let sidebar = surface(Ink.rail); sidebar.pin(rail)
-        let sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant:232)
+        let sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant:width)
         sidebarWidth.priority = .init(999); sidebarWidth.isActive = true
         let mainPane = surface(Ink.canvas); mainPane.pin(main)
         let divider = line(true)
@@ -119,21 +134,21 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         let brand = wrapped(railHeader,NSEdgeInsets(top:40,left:13,bottom:4,right:15))
         fillRow(brand,in:rail)
         let searchBox = surface(Ink.raised,radius:8); searchBox.border = Ink.line
-        let quickTitle = label("快速打开…",12,Ink.muted)
+        let quickTitle = label(L("Quick Open…"),12,Ink.muted)
         let key = label("⌘ P",10,Ink.faint,.medium)
         searchBox.pin(stack(.horizontal,[glyph("folder"),quickTitle,spring(),key],5),margins(3,10))
-        let quick = ActionButton("",tip:"快速打开文件 (⌘P)") { [weak self] in self?.showQuickOpen() }
+        let quick = ActionButton("",tip:L("Quick Open (⌘P)")) { [weak self] in self?.showQuickOpen() }
         quick.identifier = .init("quickOpen")
         searchBox.pin(quick)
         searchBox.height(32)
         fillRow(wrapped(searchBox,NSEdgeInsets(top:6,left:12,bottom:10,right:12)),in:rail)
-        let find = ActionButton("  项目搜索","magnifyingglass",tip:"项目搜索 (⇧⌘F)") { [weak self] in self?.showProjectSearch() }
+        let find = ActionButton("  "+L("Search Project"),"magnifyingglass",tip:L("Search Project (⇧⌘F)")) { [weak self] in self?.showProjectSearch() }
         find.alignment = .left
         let findRow = wrapped(find,margins(0,18)); findRow.height(32); fillRow(findRow,in:rail)
-        let newFile = ActionButton("  新建文件","square.and.pencil") { [weak self] in self?.newBuffer() }
+        let newFile = ActionButton("  "+L("New File"),"square.and.pencil") { [weak self] in self?.newBuffer() }
         newFile.alignment = .left
         let newFileRow = wrapped(newFile,margins(0,18)); newFileRow.height(32); fillRow(newFileRow,in:rail)
-        let addProject = ActionButton("","folder",iconSize:12,tip:"添加项目文件夹") { [weak self] in self?.choose(true) }
+        let addProject = ActionButton("","folder",iconSize:12,tip:L("Add Project Folder")) { [weak self] in self?.choose(true) }
         addProject.width(19); addProject.height(15)
         let section = stack(.horizontal,[treeCaption,spring(),addProject])
         fillRow(wrapped(section,NSEdgeInsets(top:20,left:16,bottom:8,right:16)),in:rail)
@@ -147,7 +162,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         }
         tabs.setContentHuggingPriority(.init(1),for:.horizontal)
         tabs.setContentCompressionResistancePriority(.init(1),for:.horizontal)
-        let top = stack(.horizontal,[crumb,tabs,editorActions,ActionButton("","doc.badge.plus",tip:"新建文件 (⌘N)") { [weak self] in self?.newBuffer() },ActionButton("","folder",tip:"打开文件 (⌘O)") { [weak self] in self?.choose(false) }],10)
+        let top = stack(.horizontal,[crumb,tabs,editorActions,ActionButton("","doc.badge.plus",tip:L("New File (⌘N)")) { [weak self] in self?.newBuffer() },ActionButton("","folder",tip:L("Open File (⌘O)")) { [weak self] in self?.choose(false) }],10)
         let topBox = wrapped(top,margins(0,14)); topBox.height(49); fillRow(topBox,in:main)
         fillRow(line(),in:main)
         fillRow(body,in:main)
@@ -223,17 +238,17 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             entry.target = self; entry.representedObject = url
         }
         if url.hasDirectoryPath { addCreationItems(to:menu,in:url) }
-        item("复制文件路径",#selector(copyTreePath(_:)))
+        item(L("Copy File Path"),#selector(copyTreePath(_:)))
         menu.addItem(.separator())
         if level == 0 {
-            item("移除项目",#selector(detachProject(_:)))
+            item(L("Remove Project"),#selector(detachProject(_:)))
             menu.addItem(.separator())
         }
-        item(level == 0 ? "删除项目…" : isFolder(url) ? "删除文件夹…" : "删除文件…",#selector(confirmTrash(_:)))
+        item(level == 0 ? L("Delete Project") : isFolder(url) ? L("Delete Folder…") : L("Delete File…"),#selector(confirmTrash(_:)))
         return menu
     }
     private func addCreationItems(to menu:NSMenu,in dir:URL) {
-        for (title,action) in [("新建文件…",#selector(newFileInFolder(_:))),("新建文件夹…",#selector(newFolderInFolder(_:)))] {
+        for (title,action) in [(L("New File"),#selector(newFileInFolder(_:))),(L("New Folder"),#selector(newFolderInFolder(_:)))] {
             let item = menu.addItem(withTitle:title,action:action,keyEquivalent:"")
             item.target = self; item.representedObject = dir
         }
@@ -242,13 +257,13 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     @objc private func newFolderInFolder(_ sender:NSMenuItem) { promptForNewItem(sender,isFolder:true) }
     private func promptForNewItem(_ sender:NSMenuItem,isFolder:Bool) {
         guard let dir = sender.representedObject as? URL else { return }
-        let kind = isFolder ? "文件夹" : "文件"
+
         let prompt = NSAlert()
-        prompt.messageText = "在“\(dir.lastPathComponent)”中新建\(kind)"
+        prompt.messageText = L(isFolder ? "New folder in “%@”" : "New file in “%@”",dir.lastPathComponent)
         let name = NSTextField(frame:NSRect(x:0,y:0,width:280,height:24))
-        name.placeholderString = isFolder ? "文件夹名称" : "文件名（含扩展名）"
+        name.placeholderString = isFolder ? L("Folder Name") : L("File Name (including extension)")
         prompt.accessoryView = name
-        prompt.addButton(withTitle:"创建"); prompt.addButton(withTitle:"取消")
+        prompt.addButton(withTitle:L("Create")); prompt.addButton(withTitle:L("Cancel"))
         prompt.window.initialFirstResponder = name
         while prompt.runModal() == .alertFirstButtonReturn {
             do { try createItem(named:name.stringValue,in:dir,isFolder:isFolder); return }
@@ -258,7 +273,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     func createItem(named name:String,in dir:URL,isFolder:Bool) throws {
         guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
               name != ".", name != "..", !name.contains("/"), !name.utf8.contains(0) else {
-            throw NSError(domain:"Folio",code:1,userInfo:[NSLocalizedDescriptionKey:"请输入有效的名称。"])
+            throw NSError(domain:"Folio",code:1,userInfo:[NSLocalizedDescriptionKey:L("Enter a valid name.")])
         }
         let url = dir.appendingPathComponent(name,isDirectory:isFolder)
         if isFolder { try FileManager.default.createDirectory(at:url,withIntermediateDirectories:false) }
@@ -296,9 +311,9 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         guard let url = sender.representedObject as? URL else { return }
         let prompt = NSAlert()
         prompt.alertStyle = .warning
-        prompt.messageText = "将“\(url.lastPathComponent)”移到废纸篓？"
-        prompt.informativeText = (isFolder(url) ? "此目录及其全部内容都会移到废纸篓。" : "这个文件会移到废纸篓。")+"\n"+url.path
-        prompt.addButton(withTitle:"取消"); prompt.addButton(withTitle:"移到废纸篓")
+        prompt.messageText = L("Move “%@” to the Trash?",url.lastPathComponent)
+        prompt.informativeText = (isFolder(url) ? L("This folder and all its contents will be moved to the Trash.") : L("This file will be moved to the Trash."))+"\n"+url.path
+        prompt.addButton(withTitle:L("Cancel")); prompt.addButton(withTitle:L("Move to Trash"))
         guard prompt.runModal() == .alertSecondButtonReturn else { return }
         do { try trashTreeItem(url) } catch { alert(error.localizedDescription) }
     }
@@ -325,7 +340,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             if let active { showEditor(active) } else { showBrowse(folder) }
         case .quick,.find:
             if roots.isEmpty { showBrowse(nil) }
-            else { header(page == .quick ? "快速打开" : "项目搜索"); runSearch() }
+            else { header(page == .quick ? L("Quick Open") : L("Search Project")); runSearch() }
         case .browse: showBrowse(folder)
         }
         updateWatches()
@@ -340,7 +355,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         let p = NSOpenPanel(); p.canChooseDirectories = directories
         p.canChooseFiles = !directories; p.allowsMultipleSelection = true
         p.directoryURL = folder ?? root
-        p.prompt = directories ? "打开项目" : "打开"
+        p.prompt = directories ? L("Open Project") : L("Open")
         if p.runModal() == .OK { open(p.urls) }
     }
     func open(_ urls:[URL]) {
@@ -385,7 +400,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     }
     func newBuffer() {
         counter += 1
-        let b = Buffer(url:nil,name:counter == 1 ? "未命名" : "未命名 \(counter)",file:try! TextFile(Data()))
+        let b = Buffer(url:nil,untitledNumber:counter,file:try! TextFile(Data()))
         attach(b); showEditor(b)
     }
     func openFile(_ url:URL,line:Int? = nil,asPreview:Bool = false) {
@@ -409,17 +424,24 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     }
     private func document(at u:URL,reportErrors:Bool = true) -> WorkspaceDocument? {
         if let existing = docs.first(where:{$0.url == u}) { return existing }
+        let b: WorkspaceDocument
+        let audio = u.pathExtension.lowercased() == "mp3", image = ImageDocument.supports(u)
         do {
-            let b: WorkspaceDocument
-            if u.pathExtension.lowercased() == "mp3" {
+            if audio {
                 b = try AudioDocument(u)
-            } else if ImageDocument.supports(u) {
+            } else if image {
                 b = try ImageDocument(u)
+            } else if FileIconDocument.prefersIcon(u), FileManager.default.isReadableFile(atPath:u.path) {
+                b = FileIconDocument(u)
             } else {
-                b = Buffer(url:u,name:"",file:try TextFile.read(u))
+                b = Buffer(url:u,file:try TextFile.read(u))
             }
-            attach(b); return b
+        } catch FileProblem.unsupported, FileProblem.large {
+            b = FileIconDocument(u)
+        } catch where (audio || image) && FileManager.default.isReadableFile(atPath:u.path) {
+            b = FileIconDocument(u)
         } catch { if reportErrors { alert(error.localizedDescription) }; return nil }
+        attach(b); return b
     }
     func attach(_ b:WorkspaceDocument) {
         docs.append(b)
@@ -478,7 +500,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         clear(editorActions)
         editorActions.isHidden = page != .edit
         if !crumb.isHidden {
-            let home = ActionButton(root?.lastPathComponent ?? "Folio","square.stack.3d.up",tip:"返回项目") { [weak self] in self?.showBrowse(self?.root) }
+            let home = ActionButton(root?.lastPathComponent ?? "Folio","square.stack.3d.up",tip:L("Back to Project")) { [weak self] in self?.showBrowse(self?.root) }
             crumb.addArrangedSubview(home)
             if let path, let root, inside(path,root) {
                 let middle = relative(path,to:root)
@@ -518,14 +540,16 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         window.isDocumentEdited = docs.contains { $0.dirty }
         if page == .edit, let audio = active as? AudioDocument {
             status.stringValue = audio.status; rightStatus.stringValue = "MP3"
+        } else if page == .edit, active is FileIconDocument {
+            status.stringValue = ""; rightStatus.stringValue = ""
         } else if page == .edit, let image = active as? ImageDocument {
             status.stringValue = image.status
             rightStatus.stringValue = [image.location.pathExtension.uppercased(), image.dimensions].filter { !$0.isEmpty }.joined(separator:"    ·    ")
         } else if page == .edit, let b = active as? Buffer {
-            status.stringValue = b.conflict ? "磁盘文件已变化" : b.dirty ? "未保存" : b.url == nil ? "新建文件" : "已保存"
+            status.stringValue = b.conflict ? L("File changed on disk") : b.dirty ? L("Unsaved") : b.url == nil ? L("New File") : L("Saved")
             let ext = b.url?.pathExtension.uppercased() ?? ""
             let codec = b.file.encoding == .utf8 ? "UTF-8" : "UTF-16"
-            rightStatus.stringValue = [ext.isEmpty ? "纯文本" : ext,codec,b.file.newline == "\r\n" ? "CRLF" : b.file.newline == "\r" ? "CR" : "LF"].joined(separator:"    ·    ")
+            rightStatus.stringValue = [ext.isEmpty ? L("Plain Text") : ext,codec,b.file.newline == "\r\n" ? "CRLF" : b.file.newline == "\r" ? "CR" : "LF"].joined(separator:"    ·    ")
             conflictBar?.isHidden = !b.conflict
         }
     }
@@ -555,14 +579,14 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         page = .browse; retireUnusedPreview(); leaveSearch(); sourceHost = nil
         folder = url ?? root; conflictBar = nil
         if let folder { root = projectRoot(for:folder,in:roots) }
-        header(folder == root ? "项目概览" : folder?.lastPathComponent ?? "工作区",path:folder != root ? folder?.deletingLastPathComponent() : nil)
+        header(folder == root ? L("Project Overview") : folder?.lastPathComponent ?? L("Workspace"),path:folder != root ? folder?.deletingLastPathComponent() : nil)
         clear(body)
         guard let dir = folder else { welcome(); updateStatus(); return }
         let all = childrenFor(dir), dirs = all.filter(\.hasDirectoryPath), files = all.filter { !$0.hasDirectoryPath }
         let col = stack(.vertical)
         body.pin(col,NSEdgeInsets(top:28,left:32,bottom:12,right:32))
         if !dirs.isEmpty {
-            let heading = stack(.horizontal,[label("文件夹",17,Ink.text,.semibold),countBadge(dirs.count),spring()],9)
+            let heading = stack(.horizontal,[label(L("Folders"),17,Ink.text,.semibold),countBadge(dirs.count),spring()],9)
             fillRow(heading,in:col)
             let strip = FolderStrip(dirs,folderMenu:{ [weak self] dir in
                 guard let self else { return nil }
@@ -574,14 +598,14 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             }
             fillRow(wrapped(strip,NSEdgeInsets(top:10,left:-2,bottom:12,right:0)),in:col)
         }
-        fillRow(stack(.horizontal,[label("文件",17,Ink.text,.semibold),countBadge(files.count),spring()],9),in:col)
-        let headerRow = stack(.horizontal,[label("名称",11,Ink.muted),spring(),label("类型",11,Ink.muted)],6)
+        fillRow(stack(.horizontal,[label(L("Files"),17,Ink.text,.semibold),countBadge(files.count),spring()],9),in:col)
+        let headerRow = stack(.horizontal,[label(L("Name"),11,Ink.muted),spring(),label(L("Type"),11,Ink.muted)],6)
         let headerTile = surface(Ink.card,radius:8); headerTile.pin(headerRow,margins(8,14))
         fillRow(wrapped(headerTile,NSEdgeInsets(top:12,left:0,bottom:2,right:0)),in:col)
         let list = RowList(rowHeight:40)
         list.row = { i in
             let u = files[i]
-            let row = stack(.horizontal,[glyph(fileIcon(u),Ink.accent,13),label(u.lastPathComponent,13),spring(),label(u.pathExtension.isEmpty ? "文本" : u.pathExtension.uppercased(),10,Ink.faint,.medium)],11)
+            let row = stack(.horizontal,[glyph(fileIcon(u),Ink.accent,13),label(u.lastPathComponent,13),spring(),label(u.pathExtension.isEmpty ? L("Text") : u.pathExtension.uppercased(),10,Ink.faint,.medium)],11)
             let v = stack(.vertical)
             fillRow(wrapped(row,margins(10,14)),in:v); fillRow(wrapped(line(),margins(0,14)),in:v)
             return v
@@ -590,20 +614,20 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         list.select = { [weak self] i in self?.openFile(files[i],asPreview:true) }
         list.doubleSelect = { [weak self] i in self?.openFile(files[i]) }
         list.reset(files.count)
-        if files.isEmpty { fillRow(wrapped(label("此目录下没有文件",12,Ink.faint),margins(14,14)),in:col) }
+        if files.isEmpty { fillRow(wrapped(label(L("No files in this folder"),12,Ink.faint),margins(14,14)),in:col) }
         fillRow(list,in:col)
         status.stringValue = dir.lastPathComponent
-        rightStatus.stringValue = "\(dirs.count) 个文件夹    ·    \(files.count) 个文件"
+        rightStatus.stringValue = L(dirs.count == 1 ? "%ld folder" : "%ld folders",dirs.count)+"    ·    "+L(files.count == 1 ? "%ld file" : "%ld files",files.count)
         updateWatches(); updateStatus()
     }
     func welcome() {
         let box = stack(.vertical,[],10)
         let art = FolderArt(frame:.zero); art.width(140); art.height(96)
         box.addArrangedSubview(art); box.setCustomSpacing(18,after:art)
-        let hint = label("打开一个项目文件夹，或从一张空白页开始",13,Ink.muted)
+        let hint = label(L("Open a project folder or start with a blank page"),13,Ink.muted)
         box.addArrangedSubview(hint); box.setCustomSpacing(24,after:hint)
         let actions = stack(.horizontal,[],10)
-        let welcomeActions: [(String,String,()->Void)] = [("打开项目","folder",{ [weak self] in self?.choose(true) }),("打开文件","doc",{ [weak self] in self?.choose(false) }),("新建文件","square.and.pencil",{ [weak self] in self?.newBuffer() })]
+        let welcomeActions: [(String,String,()->Void)] = [(L("Open Project"),"folder",{ [weak self] in self?.choose(true) }),(L("Open File"),"doc",{ [weak self] in self?.choose(false) }),(L("New File"),"square.and.pencil",{ [weak self] in self?.newBuffer() })]
         for (i,(text,icon,run)) in welcomeActions.enumerated() {
             let btn = ActionButton(" "+text,icon,run:run)
             btn.font = .systemFont(ofSize:13,weight:.medium)
@@ -615,7 +639,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         body.addSubview(box); box.translatesAutoresizingMaskIntoConstraints = false
         box.centerXAnchor.constraint(equalTo:body.centerXAnchor).isActive = true
         box.centerYAnchor.constraint(equalTo:body.centerYAnchor).isActive = true
-        status.stringValue = "就绪"; rightStatus.stringValue = ""
+        status.stringValue = L("Ready"); rightStatus.stringValue = ""
     }
     func showEditor(_ document:WorkspaceDocument,line jump:Int? = nil) {
         leaveSearch()
@@ -655,7 +679,9 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         #endif
     }
     private func mountDocument(_ document:WorkspaceDocument,line jump:Int?) {
-        if let audio = document as? AudioDocument {
+        if let file = document as? FileIconDocument {
+            conflictBar = nil; body.pin(file.makeView(),margins(16,16)); window.makeFirstResponder(nil)
+        } else if let audio = document as? AudioDocument {
             audio.show()
             conflictBar = nil; body.pin(audio.view,margins(24,24)); window.makeFirstResponder(nil)
         } else if let image = document as? ImageDocument {
@@ -670,7 +696,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     }
     private func addBrowserAction(_ b:Buffer) {
         if let url = b.url, ["html","htm"].contains(url.pathExtension.lowercased()) {
-            editorActions.addArrangedSubview(ActionButton("","safari",iconSize:17,tip:"在浏览器打开") { [weak self] in self?.openHTML() })
+            editorActions.addArrangedSubview(ActionButton("","safari",iconSize:17,tip:L("Open in Browser")) { [weak self] in self?.openHTML() })
         }
     }
     private func showText(_ b:Buffer,line jump:Int?) {
@@ -678,7 +704,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         let column = stack(.vertical)
         body.pin(column)
         if b.markdown {
-            let modes = NSSegmentedControl(labels:["源码","分栏","预览"],trackingMode:.selectOne,target:self,action:#selector(switchMode(_:)))
+            let modes = NSSegmentedControl(labels:[L("Source"),L("Split"),L("Preview")],trackingMode:.selectOne,target:self,action:#selector(switchMode(_:)))
             modes.segmentStyle = .rounded; modes.controlSize = .regular
             modes.font = .systemFont(ofSize:12,weight:.medium)
             modes.height(26)
@@ -687,7 +713,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             editorActions.addArrangedSubview(modes)
         }
         addBrowserAction(b)
-        let conflict = stack(.horizontal,[glyph("exclamationmark.triangle",Ink.warn),label("文件已在外部更改",12),spring(),ActionButton("查看并处理") { [weak self] in if let b = self?.active as? Buffer { self?.resolve(b) } }],8)
+        let conflict = stack(.horizontal,[glyph("exclamationmark.triangle",Ink.warn),label(L("File changed outside Folio"),12),spring(),ActionButton(L("Review Changes")) { [weak self] in if let b = self?.active as? Buffer { self?.resolve(b) } }],8)
         let banner = wrapped(conflict,margins(8,16),Ink.warnWash)
         fillRow(banner,in:column); conflictBar = banner; banner.isHidden = !b.conflict
         let content = NSView(); fillRow(content,in:column)
@@ -721,8 +747,8 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
               ["html","htm"].contains(url.pathExtension.lowercased()) else { return nil }
         if buffer.dirty {
             let prompt = NSAlert()
-            prompt.messageText = "保存修改后在浏览器中打开？"
-            prompt.addButton(withTitle:"保存并打开"); prompt.addButton(withTitle:"取消"); prompt.addButton(withTitle:"打开磁盘版本")
+            prompt.messageText = L("Save changes before opening in the browser?")
+            prompt.addButton(withTitle:L("Save and Open")); prompt.addButton(withTitle:L("Cancel")); prompt.addButton(withTitle:L("Open Version on Disk"))
             switch prompt.runModal() {
             case .alertFirstButtonReturn: guard saveActive() else { return nil }
             case .alertThirdButtonReturn: break
@@ -735,7 +761,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         guard let url = htmlURLForBrowser() else { return }
         let system = NSWorkspace.shared
         guard let browser = system.urlForApplication(toOpen:URL(string:"https://example.com")!) else {
-            alert("找不到默认浏览器。"); return
+            alert(L("No default browser was found.")); return
         }
         system.open([url],withApplicationAt:browser,configuration:.init()) { [weak self] _,error in
             if let error { DispatchQueue.main.async { self?.alert(error.localizedDescription) } }
@@ -752,12 +778,12 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     }
     func showQuickOpen() { showSearch(content:false) }
     func showProjectSearch() { showSearch(content:true) }
-    private func showSearch(content:Bool) {
+    private func showSearch(content:Bool,query:String? = nil) {
         if root == nil { choose(true) }
         guard root != nil else { return }
         deactivateDocument()
         page = content ? .find : .quick; retireUnusedPreview(); conflictBar = nil; sourceHost = nil
-        let heading = content ? "项目搜索" : "快速打开"
+        let heading = content ? L("Search Project") : L("Quick Open")
         header(heading)
         clear(body)
         let col = stack(.vertical,[],12)
@@ -765,8 +791,8 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         fillRow(label(heading,22,Ink.text,.semibold),in:col)
         let field = NSSearchField()
         field.font = .systemFont(ofSize:15); field.controlSize = .large
-        field.placeholderString = content ? "搜索项目中的文字" : "输入文件名或部分路径"
-        field.stringValue = content ? lastContentQuery : ""
+        field.placeholderString = content ? L("Search text in the project") : L("Enter a file name or part of a path")
+        field.stringValue = query ?? (content ? lastContentQuery : "")
         field.delegate = self
         fillRow(field,in:col); searchField = field
         let summary = label("",11,Ink.muted); fillRow(summary,in:col); searchTitle = summary
@@ -774,14 +800,14 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         list.row = { [weak self] i in
             guard let self, i < self.resultHits.count else { return NSView() }
             let h = self.resultHits[i]
-            let title = stack(.vertical,[label(h.path+(h.line.map { "  ·  第 \($0) 行" } ?? ""),12,Ink.text,.medium)],3)
+            let title = stack(.vertical,[label(h.path+(h.line.map { "  ·  "+L("Line %ld",$0) } ?? ""),12,Ink.text,.medium)],3)
             if h.line != nil { title.addArrangedSubview(label(h.excerpt,11,Ink.muted)) }
             return wrapped(stack(.horizontal,[glyph(fileIcon(h.url),Ink.accent,13),title,spring()],11),margins(4,10))
         }
         list.select = { [weak self] i in self?.openHit(i) }
         fillRow(list,in:col); resultList = list
         resultHits = []
-        status.stringValue = roots.count > 1 ? "全部项目（\(roots.count)）" : root?.lastPathComponent ?? ""; rightStatus.stringValue = ""
+        status.stringValue = roots.count > 1 ? L("All Projects (%ld)",roots.count) : root?.lastPathComponent ?? ""; rightStatus.stringValue = ""
         runSearch(); window.makeFirstResponder(field)
     }
     func runSearch(debounce:Bool = false) {
@@ -790,14 +816,14 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         if page == .find {
             lastContentQuery = field.stringValue
             if lastContentQuery.isEmpty {
-                search.cancel(); searchTitle?.stringValue = "输入关键词以查找文件内容"; return
+                search.cancel(); searchTitle?.stringValue = L("Enter a search term to find text in files"); return
             }
         }
-        searchTitle?.stringValue = "正在查找…"
+        searchTitle?.stringValue = L("Searching…")
         search.run(roots:roots,query:field.stringValue,content:page == .find,buffers:docs.compactMap { $0 as? Buffer },debounce:debounce) { [weak self] hits,error in
             guard let self else { return }
             self.resultHits = hits; self.resultList?.reset(hits.count)
-            self.searchTitle?.stringValue = error ?? (hits.isEmpty ? "没有匹配结果" : hits.count == 1000 ? "显示前 1,000 条结果" : "\(hits.count) 条结果")
+            self.searchTitle?.stringValue = error ?? (hits.isEmpty ? L("No matches") : hits.count == 1000 ? L("Showing the first 1,000 results") : L(hits.count == 1 ? "%ld result" : "%ld results",hits.count))
         }
     }
     func openHit(_ i:Int) {
@@ -823,7 +849,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         return false
     }
     func alert(_ text:String) {
-        let a = NSAlert(); a.messageText = text; a.addButton(withTitle:"好"); a.runModal()
+        let a = NSAlert(); a.messageText = text; a.addButton(withTitle:L("OK")); a.runModal()
     }
     func resolve(_ b:Buffer) {
         guard let u = b.url else { return }
@@ -831,10 +857,10 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         do { disk = FileManager.default.fileExists(atPath:u.path) ? try TextFile.read(u) : nil }
         catch { alert(error.localizedDescription); return }
         let a = NSAlert()
-        a.messageText = disk == nil ? "磁盘上的文件已移除" : "比较外部修改"
-        a.informativeText = "选择要保留的版本。保留编辑内容后，可用 ⌘S 写入磁盘。"
+        a.messageText = disk == nil ? L("File removed from disk") : L("Compare External Changes")
+        a.informativeText = L("Choose which version to keep. To write your edits to disk, keep them and press ⌘S.")
         let columns = stack(.horizontal,[],10)
-        for (title,txt) in [("磁盘版本",disk?.text ?? "（已移除）"),("编辑器版本",b.source.string)] {
+        for (title,txt) in [(L("Version on Disk"),disk?.text ?? L("(Removed)")),(L("Editor Version"),b.source.string)] {
             let v = NSTextView(); v.isEditable = false; v.isRichText = false
             v.font = .monospacedSystemFont(ofSize:11,weight:.regular); v.string = txt
             let s = scroll(v); s.width(250); s.height(170)
@@ -842,8 +868,8 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         }
         columns.frame = NSRect(x:0,y:0,width:510,height:194)
         a.accessoryView = columns
-        a.addButton(withTitle:"取消"); a.addButton(withTitle:"保留编辑内容")
-        if disk != nil { a.addButton(withTitle:"载入磁盘版本") }
+        a.addButton(withTitle:L("Cancel")); a.addButton(withTitle:L("Keep My Edits"))
+        if disk != nil { a.addButton(withTitle:L("Load Version from Disk")) }
         let response = a.runModal()
         if response == .alertSecondButtonReturn {
             b.baseline = disk?.digest
@@ -866,7 +892,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             #endif
             target = p.url?.standardizedFileURL.resolvingSymlinksInPath()
             if let target, docs.contains(where:{$0 !== b && $0.url == target}) {
-                alert("此文件已在另一个标签页中打开。"); return false
+                alert(L("This file is already open in another tab.")); return false
             }
             if target != b.url,let target {
                 do { expected = try TextFile.diskDigest(target) }
@@ -892,8 +918,8 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         guard b.dirty || (b.conflict && b.missing) else { return true }
         window.makeKeyAndOrderFront(nil)
         showEditor(b)
-        let a = NSAlert(); a.messageText = "保存“\(b.title)”的修改？"
-        a.addButton(withTitle:"保存"); a.addButton(withTitle:"取消"); a.addButton(withTitle:"放弃修改")
+        let a = NSAlert(); a.messageText = L("Save changes to “%@”?",b.title)
+        a.addButton(withTitle:L("Save")); a.addButton(withTitle:L("Cancel")); a.addButton(withTitle:L("Discard Changes"))
         switch a.runModal() {
         case .alertFirstButtonReturn: return saveActive()
         case .alertThirdButtonReturn: return true
