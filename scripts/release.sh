@@ -70,4 +70,4 @@ fi
 "$tools/generate_appcast" --account "$account" --download-url-prefix "https://github.com/moosl/Folio/releases/download/v$version/" "$updates"
 mv "$updates/$archive" "dist/$archive"
 mv "$updates/appcast.xml" dist/appcast.xml
-echo "公证发行包和更新清单：dist/$archive、dist/appcast.xml"
+echo "公证发行包和更新清单：dist/${archive}、dist/appcast.xml"

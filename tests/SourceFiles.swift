@@ -26,7 +26,7 @@ private let sourceExamples = [
     ("hello.js hello.mjs hello.cjs", "const message = 'JavaScript';"),
     ("hello.jsx", "const Hello = () => <main>Hello</main>;"),
     ("hello.ts hello.mts hello.cts", "const message: string = 'TypeScript';"),
-    ("hello.tsx", "const Hello = () => <span>Hello</span>;"),
+    ("hello.tsx", "import React from 'react';\nconst Hello = () => <span>" + String(repeating:"Hello ",count:40) + "</span>;"),
     ("hello.vue", "<template><p>Hello</p></template>"),
     ("hello.svelte hello.astro", "<main>Hello, world</main>"),
     ("hello.dart", "void main() => print('Dart');"),
@@ -94,6 +94,8 @@ private func visibleFirstLine(_ buffer:Buffer,in window:NSWindow) -> Bool {
     let glyphs = layout.glyphRange(forCharacterRange:first,actualCharacterRange:nil)
     var rect = layout.boundingRect(forGlyphRange:glyphs,in:container)
     rect = rect.offsetBy(dx:source.textContainerOrigin.x,dy:source.textContainerOrigin.y)
+    let gutterEdge = source.convert(buffer.gutter.bounds,from:buffer.gutter).maxX
+    guard rect.minX >= max(gutterEdge,source.visibleRect.minX) else { return false }
     rect = rect.insetBy(dx:3,dy:1).intersection(source.visibleRect)
     guard rect.width >= 8, rect.height >= 5 else { return false }
     rect = root.convert(rect,from:source)

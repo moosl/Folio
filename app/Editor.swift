@@ -342,8 +342,11 @@ final class Buffer: NSObject, NSTextViewDelegate, NSTextStorageDelegate, Workspa
                 let glyph = lm.glyphIndexForCharacter(at:at)
                 position.y = lm.lineFragmentRect(forGlyphAt:glyph,effectiveRange:nil).minY + editor.source.textContainerOrigin.y + topOffset
             }
-            editor.scroller.contentView.scroll(to:position)
-            editor.scroller.reflectScrolledClipView(editor.scroller.contentView)
+            let clip = editor.scroller.contentView
+            // The leading edge can have a negative scroll origin to accommodate the ruler.
+            let viewport = clip.constrainBoundsRect(NSRect(origin:position,size:clip.bounds.size))
+            clip.scroll(to:viewport.origin)
+            editor.scroller.reflectScrolledClipView(clip)
             needsScrollRestore = false
         }
         if coloredRange == nil, editor.storage.length < 600_000 { refreshColors() }
