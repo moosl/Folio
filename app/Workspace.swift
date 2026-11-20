@@ -4,6 +4,9 @@ enum Page { case browse, edit, quick, find }
 final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     private(set) var roots = [URL]()
     private let projectDefaults: UserDefaults?
+    #if FOLIO_STORE
+    private let storeAccess = StoreFileAccess()
+    #endif
     private let projectPathsKey = "FolioProjectPaths"
     private let tabsKey = "FolioOpenTabs"
     private(set) weak var previewTab: WorkspaceDocument?
@@ -46,10 +49,24 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         window.center()
         makeShell()
         watches.onChange = { [weak self] in self?.diskChanged(paths:$0) }
-        for path in projectDefaults?.stringArray(forKey:projectPathsKey) ?? [] where path.hasPrefix("/") {
-            let url = URL(fileURLWithPath:path,isDirectory:true)
+        let savedRoots = projectDefaults?.stringArray(forKey:projectPathsKey) ?? []
+        #if FOLIO_STORE
+        var restoredPaths = savedRoots
+        #endif
+        for (index,path) in savedRoots.enumerated() where path.hasPrefix("/") {
+            var url = URL(fileURLWithPath:path,isDirectory:true)
+            #if FOLIO_STORE
+            url = storeAccess.resolve(url)
+            if url.path != path, isFolder(url) {
+                restoredPaths[index] = url.path
+                storeAccess.remember(url)
+            }
+            #endif
             if isFolder(url), !roots.contains(url) { roots.append(url) }
         }
+        #if FOLIO_STORE
+        if restoredPaths != savedRoots { projectDefaults?.set(restoredPaths,forKey:projectPathsKey) }
+        #endif
         if let first = roots.first { expanded.insert(first) }
         showBrowse(roots.first)
         restoreTabs()
@@ -57,18 +74,23 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     private func restoreTabs() {
         guard let state = projectDefaults?.dictionary(forKey:tabsKey),
               let paths = state["paths"] as? [String] else { return }
+        var selected: WorkspaceDocument?
         for path in paths where path.hasPrefix("/") {
             autoreleasepool {
-                let url = URL(fileURLWithPath:path,isDirectory:false).standardizedFileURL.resolvingSymlinksInPath()
+                var url = URL(fileURLWithPath:path,isDirectory:false)
+                #if FOLIO_STORE
+                url = storeAccess.resolve(url)
+                #endif
+                url = url.standardizedFileURL.resolvingSymlinksInPath()
                 guard FileManager.default.fileExists(atPath:url.path), !isFolder(url),
                       let doc = document(at:url,reportErrors:false) else { return }
                 (doc as? Buffer)?.file.compact()
                 (doc as? AudioDocument)?.hide()
                 if path == state["preview"] as? String { previewTab = doc }
+                if path == state["selected"] as? String { selected = doc }
             }
         }
-        let selected = docs.first { $0.url?.path == state["selected"] as? String } ?? docs.last
-        if let selected { showEditor(selected) }
+        if let doc = selected ?? docs.last { showEditor(doc) }
     }
 
     func makeShell() {
@@ -324,6 +346,10 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     func open(_ urls:[URL]) {
         var files = [URL](), projects = [URL]()
         for url in urls {
+            #if FOLIO_STORE
+            storeAccess.accept(url)
+            storeAccess.remember(url)
+            #endif
             let path = url.standardizedFileURL.resolvingSymlinksInPath()
             if isFolder(path) { projects.append(URL(fileURLWithPath:path.path,isDirectory:true)) }
             else { files.append(path) }
@@ -624,6 +650,9 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         window.contentView?.layoutSubtreeIfNeeded()
         if let tab = tabViews[ObjectIdentifier(document)] { tab.scrollToVisible(tab.bounds) }
         updateStatus(); updateWatches()
+        #if FOLIO_STORE
+        storeAccess.releaseUnused(keeping:roots + docs.compactMap(\.url))
+        #endif
     }
     private func mountDocument(_ document:WorkspaceDocument,line jump:Int?) {
         if let audio = document as? AudioDocument {
@@ -832,6 +861,9 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             p.nameFieldStringValue = b.url?.lastPathComponent ?? b.untitled+".txt"
             p.directoryURL = b.url?.deletingLastPathComponent() ?? folder
             if p.runModal() != .OK { return false }
+            #if FOLIO_STORE
+            if let url = p.url { storeAccess.accept(url) }
+            #endif
             target = p.url?.standardizedFileURL.resolvingSymlinksInPath()
             if let target, docs.contains(where:{$0 !== b && $0.url == target}) {
                 alert("此文件已在另一个标签页中打开。"); return false
@@ -845,6 +877,9 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         do {
             let wasMarkdown = b.markdown
             try b.save(to:target,expected:expected)
+            #if FOLIO_STORE
+            storeAccess.remember(target)
+            #endif
             if previewTab === b { previewTab = nil }
             if b.markdown && !wasMarkdown { b.mode = .preview }
             childCache.removeAll(); treeDirty = true; showEditor(b); return true
@@ -885,6 +920,12 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         var state: [String:Any] = ["paths":docs.compactMap { $0.url?.path }]
         state["selected"] = selected?.url?.path
         state["preview"] = previewTab?.url?.path
+        #if FOLIO_STORE
+        let restoredItems = roots + docs.compactMap(\.url)
+        for url in restoredItems { storeAccess.remember(url) }
+        let saved = projectDefaults?.stringArray(forKey:projectPathsKey) ?? []
+        storeAccess.keepBookmarks(for:Set(saved + restoredItems.map(\.path)))
+        #endif
         projectDefaults?.set(state,forKey:tabsKey)
         return true
     }

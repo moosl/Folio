@@ -8,6 +8,9 @@ extra=()
 if [[ "${1:-}" == "--test" ]]; then
   bundle=.build/tests/Folio.app
   extra=(-D FOLIO_TEST tests/Integration.swift tests/SourceFiles.swift)
+elif [[ "${1:-}" == "--store" ]]; then
+  bundle=.build/app-store/Folio.app
+  extra=(-D FOLIO_STORE)
 elif [[ "${1:-}" == "--benchmark" ]]; then
   bundle=.build/benchmark/Folio.app
   extra=(-D FOLIO_BENCH tests/Performance.swift)
@@ -23,15 +26,19 @@ fetch() {
   echo "$digest  $archive" | shasum -a 256 -c -
 }
 sparkle_version=2.10.1
-sparkle="$vendor/sparkle-$sparkle_version"
-fetch "$sparkle.tar.xz" "https://github.com/sparkle-project/Sparkle/releases/download/$sparkle_version/Sparkle-$sparkle_version.tar.xz" 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
-if [[ ! -d "$sparkle/Sparkle.framework" ]]; then
-  mkdir -p "$sparkle"
-  tar -xf "$sparkle.tar.xz" -C "$sparkle"
+updater_flags=()
+if [[ "${1:-}" != "--store" ]]; then
+  sparkle="$vendor/sparkle-$sparkle_version"
+  fetch "$sparkle.tar.xz" "https://github.com/sparkle-project/Sparkle/releases/download/$sparkle_version/Sparkle-$sparkle_version.tar.xz" 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
+  if [[ ! -d "$sparkle/Sparkle.framework" ]]; then
+    mkdir -p "$sparkle"
+    tar -xf "$sparkle.tar.xz" -C "$sparkle"
+  fi
+  mkdir -p "$app/Frameworks"
+  ditto "$sparkle/Sparkle.framework" "$app/Frameworks/Sparkle.framework"
+  cp "$sparkle/LICENSE" "$app/Resources/Sparkle-LICENSE"
+  updater_flags=(-F "$sparkle" -framework Sparkle -Xlinker -rpath -Xlinker @executable_path/../Frameworks)
 fi
-mkdir -p "$app/Frameworks"
-ditto "$sparkle/Sparkle.framework" "$app/Frameworks/Sparkle.framework"
-cp "$sparkle/LICENSE" "$app/Resources/Sparkle-LICENSE"
 cmark="$vendor/swift-cmark-0.6.0"
 fetch "$vendor/cmark.tar.gz" https://codeload.github.com/swiftlang/swift-cmark/tar.gz/refs/tags/0.6.0 6e2d1ecc9791bd7b2cfec22b5a2bc108c4f549c0b09def8953204467efabcb12
 test -d "$cmark" || tar -xzf "$vendor/cmark.tar.gz" -C "$vendor"
@@ -74,7 +81,7 @@ if [[ -f "$swift_include/module.modulemap" && -f "$swift_include/bridging.module
   printf '{"version":0,"roots":[{"type":"file","name":"%s/module.modulemap","external-contents":"%s/.build/empty.modulemap"}]}' "$(cd "$swift_include" && pwd -P)" "$PWD" > .build/swift-overlay.json
   swift_flags+=(-vfsoverlay "$PWD/.build/swift-overlay.json" -module-cache-path "$PWD/.build/cltcached" -Xcc -ivfsoverlay -Xcc "$PWD/.build/swift-overlay.json")
 fi
-swiftc "${swift_flags[@]}" -O -whole-module-optimization -F "$sparkle" -framework Sparkle -Xlinker -rpath -Xlinker @executable_path/../Frameworks -Xlinker -dead_strip -swift-version 5 -target "$(uname -m)-apple-macosx13.0" -I "$cmark/src/include" -I "$cmark/extensions/include" -I app/CYaml -Xcc "-I$PWD/$yaml/include" app/*.swift "${extra[@]}" "$objects/cmark.a" "$yaml_objects/libyaml.a" -o "$app/MacOS/Folio"
+swiftc "${swift_flags[@]}" -O -whole-module-optimization "${updater_flags[@]}" -Xlinker -dead_strip -swift-version 5 -target "$(uname -m)-apple-macosx13.0" -I "$cmark/src/include" -I "$cmark/extensions/include" -I app/CYaml -Xcc "-I$PWD/$yaml/include" app/*.swift "${extra[@]}" "$objects/cmark.a" "$yaml_objects/libyaml.a" -o "$app/MacOS/Folio"
 iconset=.build/FolioAppIcon.iconset
 icon_source=app/Resources/FolioAppIcon.icon/Assets/Folder.png
 icon_digest=$(shasum -a 256 "$icon_source" | cut -d ' ' -f 1)
@@ -98,7 +105,19 @@ if [[ "${1:-}" == "--test" ]]; then
 elif [[ "${1:-}" == "--benchmark" ]]; then
   plutil -replace CFBundleIdentifier -string local.folio.benchmark "$app/Info.plist"
 fi
-codesign --force --sign - "$app/Helpers/rg"
-codesign --force --sign - "$bundle"
+if [[ "${1:-}" == "--store" ]]; then
+  cp store/PrivacyInfo.xcprivacy "$app/Resources/"
+  for key in SUFeedURL SUPublicEDKey SURequireSignedFeed SUVerifyUpdateBeforeExtraction; do
+    plutil -remove "$key" "$app/Info.plist"
+  done
+  plutil -replace CFBundleIdentifier -string "${FOLIO_STORE_BUNDLE_ID:-io.github.moosl.Folio}" "$app/Info.plist"
+  plutil -insert LSApplicationCategoryType -string public.app-category.developer-tools "$app/Info.plist"
+  signer=${FOLIO_STORE_APP_IDENTITY:--}
+  codesign --force --sign "$signer" --entitlements store/Helper.entitlements "$app/Helpers/rg"
+  codesign --force --sign "$signer" --entitlements store/Folio.entitlements "$bundle"
+else
+  codesign --force --sign - "$app/Helpers/rg"
+  codesign --force --sign - "$bundle"
+fi
 touch "$bundle"
 echo "Built $bundle"

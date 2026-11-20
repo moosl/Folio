@@ -1,10 +1,14 @@
 import AppKit
+#if !FOLIO_STORE
 import Sparkle
+#endif
 
 final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private(set) var editor: Workspace!
     private var pendingURLs = [URL]()
+    #if !FOLIO_STORE
     private let updates = SPUStandardUpdaterController(startingUpdater:false,updaterDelegate:nil,userDriverDelegate:nil)
+    #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ThemeButton.restorePreference()
@@ -14,7 +18,7 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #else
         editor = Workspace()
         #endif
-        #if !FOLIO_TEST && !FOLIO_BENCH
+        #if !FOLIO_STORE && !FOLIO_TEST && !FOLIO_BENCH
         updates.startUpdater()
         #endif
         menus()
@@ -71,8 +75,10 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return i
         }
         let app = menu("Folio")
+        #if !FOLIO_STORE
         _ = item(app,"检查更新…",#selector(SPUStandardUpdaterController.checkForUpdates(_:)),"",[],updates)
         app.addItem(.separator())
+        #endif
         _ = item(app,"退出 Folio",#selector(NSApplication.terminate(_:)),"q")
         let f = menu("文件")
         _ = item(f,"新建文件",#selector(newDoc),"n",.command,self)
