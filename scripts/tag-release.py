@@ -7,6 +7,7 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import plistlib
 from pathlib import Path
 import re
 import shutil
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+from zipfile import ZipFile
 
 REPO = "moosl/Folio"
 REMOTE = f"https://github.com/{REPO}.git"
@@ -88,7 +90,6 @@ def publish(tag, sha, previous):
     job = ROOT / "jobs" / tag
     job.mkdir(parents=True, exist_ok=True)
     key = run("git", "-C", MIRROR, "show", f"{sha}:app/Info.plist")
-    import plistlib
     key = plistlib.loads(key.encode())["SUPublicEDKey"]
     run("gh", "release", "download", previous, "--repo", REPO, "--pattern", "appcast.xml",
         "--output", job / "previous.xml", "--clobber")
@@ -100,7 +101,26 @@ def publish(tag, sha, previous):
     record.write_text(json.dumps(expected))
     name = f"Folio-{tag[1:]}-macOS-arm64.zip"
     archive, feed = job / name, job / "appcast.xml"
-    if not (archive.exists() and feed.exists()):
+    if archive.exists() and not feed.exists():
+        # A notarized ZIP can survive an interrupted signing session. Verify it before resuming.
+        verifier = run("git", "-C", MIRROR, "show", f"{sha}:scripts/verify-release-zip.sh")
+        subprocess.run(["bash", "-s", "--", str(archive)], input=verifier, text=True, check=True)
+        with ZipFile(archive) as z:
+            info = plistlib.loads(z.read("Folio.app/Contents/Info.plist"))
+        if (info["CFBundleShortVersionString"], info["CFBundleVersion"], info["SUPublicEDKey"]) != (tag[1:], str(build), key):
+            raise ValueError("Saved ZIP metadata does not match its job")
+        recipe = run("git", "-C", MIRROR, "show", f"{sha}:scripts/build.sh")
+        pinned = re.search(r"^sparkle_version=([0-9]+\.[0-9]+\.[0-9]+)$", recipe, re.M)
+        if not pinned:
+            raise ValueError("Missing pinned Sparkle version")
+        generator = ROOT / "vendor" / ("sparkle-" + pinned[1]) / "bin/generate_appcast"
+        with tempfile.TemporaryDirectory(dir=job) as td:
+            updates = Path(td)
+            os.link(archive, updates / name)
+            run(generator, "--account", "moosl.Folio.updates", "--download-url-prefix",
+                f"https://github.com/{REPO}/releases/download/{tag}/", updates)
+            (updates / "appcast.xml").replace(feed)
+    if not archive.exists():
         LOG.info("Building %s (%s) at %s", tag, build, sha)
         with tempfile.TemporaryDirectory(dir=ROOT, prefix="build-") as td:
             work = Path(td)
@@ -108,7 +128,8 @@ def publish(tag, sha, previous):
             run("git", "checkout", "--quiet", "--detach", sha, cwd=work)
             (work / ".build").mkdir()
             (work / ".build/vendor").symlink_to(ROOT / "vendor", target_is_directory=True)
-            env = dict(os.environ, FOLIO_RELEASE_VERSION=tag[1:], FOLIO_RELEASE_BUILD=str(build))
+            env = dict(os.environ, FOLIO_RELEASE_VERSION=tag[1:], FOLIO_RELEASE_BUILD=str(build),
+                       FOLIO_NOTARIZED_ARCHIVE=str(archive))
             with (job / "build.log").open("a") as out:
                 subprocess.run(["bash", "scripts/release.sh"], cwd=work, env=env, stdout=out,
                                stderr=subprocess.STDOUT, check=True)

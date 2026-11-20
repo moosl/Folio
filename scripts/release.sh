@@ -16,6 +16,8 @@ bash scripts/build.sh
 stage=$(mktemp -d "${TMPDIR:-/tmp}/Folio-release.XXXXXXXX")
 bundle="$stage/Folio.app"
 ditto dist/Folio.app "$bundle"
+# Public application payload, even when the local signing job uses a private umask.
+chmod -R a+rX "$bundle"
 if [[ -n "${FOLIO_RELEASE_VERSION:-}" || -n "${FOLIO_RELEASE_BUILD:-}" ]]; then
   [[ "${FOLIO_RELEASE_VERSION:-}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ && "${FOLIO_RELEASE_BUILD:-}" =~ ^[1-9][0-9]*$ ]] || exit 2
   plutil -replace CFBundleShortVersionString -string "$FOLIO_RELEASE_VERSION" "$bundle/Contents/Info.plist"
@@ -51,6 +53,10 @@ version=$(plutil -extract CFBundleShortVersionString raw "$bundle/Contents/Info.
 archive="Folio-$version-macOS-$(uname -m).zip"
 ditto -c -k --norsrc --noextattr --noacl --keepParent "$bundle" "$stage/$archive"
 bash scripts/verify-release-zip.sh "$stage/$archive"
+if [[ -n "${FOLIO_NOTARIZED_ARCHIVE:-}" ]]; then
+  cp "$stage/$archive" "$FOLIO_NOTARIZED_ARCHIVE.partial"
+  mv -f "$FOLIO_NOTARIZED_ARCHIVE.partial" "$FOLIO_NOTARIZED_ARCHIVE"
+fi
 updates="$stage/updates"
 mkdir "$updates"
 mv "$stage/$archive" "$updates/$archive"

@@ -10,6 +10,9 @@ from zipfile import ZipFile
 import sys
 with ZipFile(sys.argv[1]) as z:
     for entry in z.infolist():
+        mode = entry.external_attr >> 16
+        if mode & 0o444 != 0o444 or (mode & 0o100 and mode & 0o111 != 0o111):
+            sys.exit(f"Application files must be readable and executables runnable by all users: {entry.filename}")
         path = PurePosixPath(entry.filename)
         if not path.parts or path.parts[0] != "Folio.app" or ".." in path.parts or any(p.startswith("._") for p in path.parts):
             sys.exit(f"Unexpected release ZIP entry: {entry.filename}")
