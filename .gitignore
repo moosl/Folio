@@ -1,0 +1,25 @@
+# Local builds, downloaded toolchains and release archives
+/.build/
+/dist/
+DerivedData/
+node_modules/
+.DS_Store
+xcuserdata/
+
+# Earlier icon concepts and superseded exports. The current catalog and both OS variants are tracked.
+/*.png
+/app/Resources/Folio.png
+/app/Resources/Folio.svg
+/app/Resources/FolioAppIcon.png
+
+# Developer credentials and local configuration
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.keychain-db
+*.mobileprovision
+*.provisionprofile
+*.pem
+*.key

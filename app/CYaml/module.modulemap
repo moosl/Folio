@@ -1,0 +1,4 @@
+module CYaml [system] {
+    header "CYaml.h"
+    export *
+}

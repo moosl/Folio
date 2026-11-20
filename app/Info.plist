@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>local.folio.editor</string>
+<key>CFBundleIconName</key><string>FolioAppIcon</string>
+<key>CFBundleIconFile</key><string>FolioAppIcon.icns</string>
+<key>SUFeedURL</key><string>https://github.com/moosl/Folio/releases/latest/download/appcast.xml</string>
+<key>SUPublicEDKey</key><string>owboQDBrlchwN66CgGyNI6tROwd6ZAA8xL7MeFm1KTk=</string>
+<key>SURequireSignedFeed</key><true/>
+<key>SUVerifyUpdateBeforeExtraction</key><true/>
+<key>CFBundleName</key><string>Folio</string>
+<key>CFBundleExecutable</key><string>Folio</string>
+<key>CFBundleVersion</key><string>5</string>
+<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSMinimumSystemVersion</key><string>13.0</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>public.text</string><string>public.source-code</string><string>public.folder</string><string>public.json</string><string>net.daringfireball.markdown</string></array></dict><dict><key>CFBundleTypeRole</key><string>Viewer</string><key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>public.image</string><string>public.mp3</string></array></dict></array>
+</dict></plist>
