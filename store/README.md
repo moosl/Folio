@@ -11,7 +11,7 @@ productbuild --component .build/app-store/Folio.app /Applications \
 pkgutil --check-signature .build/app-store/Folio.pkg
 ```
 
-创建 App Store Connect 的 macOS 应用记录后，使用其数字 ID 上传。上传、苹果处理构建、提交审核是三个独立步骤。
+Folio 的 macOS 应用记录 ID 为 `6837168419`。使用支持 `com.apple.pkg` 上传类型的 asc（已实测 7.0.0）。再次上传同一商店版本时，用 `FOLIO_STORE_BUILD` 指定新的内部构建号。上传、苹果处理构建、提交审核是三个独立步骤。
 
 ```sh
 app=.build/app-store/Folio.app/Contents/Info.plist
