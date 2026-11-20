@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+umask 022
 cd "$(dirname "$0")/.."
 
 identity=${FOLIO_SIGN_IDENTITY:-}
@@ -16,8 +17,6 @@ bash scripts/build.sh
 stage=$(mktemp -d "${TMPDIR:-/tmp}/Folio-release.XXXXXXXX")
 bundle="$stage/Folio.app"
 ditto dist/Folio.app "$bundle"
-# Public application payload, even when the local signing job uses a private umask.
-chmod -R a+rX "$bundle"
 if [[ -n "${FOLIO_RELEASE_VERSION:-}" || -n "${FOLIO_RELEASE_BUILD:-}" ]]; then
   [[ "${FOLIO_RELEASE_VERSION:-}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ && "${FOLIO_RELEASE_BUILD:-}" =~ ^[1-9][0-9]*$ ]] || exit 2
   plutil -replace CFBundleShortVersionString -string "$FOLIO_RELEASE_VERSION" "$bundle/Contents/Info.plist"
@@ -46,6 +45,8 @@ for attempt in 1 2 3; do
   sleep 3
 done
 xcrun stapler staple "$bundle"
+# Signing and stapling also create files. Normalize the complete public payload.
+chmod -R a+rX "$bundle"
 xcrun stapler validate "$bundle"
 spctl --assess --type execute --verbose=2 "$bundle"
 
