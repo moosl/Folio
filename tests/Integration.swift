@@ -1,5 +1,6 @@
 import Cocoa
 import WebKit
+import Sparkle
 
 private func check(_ ok:@autoclosure ()->Bool,_ description:String) {
     if !ok() { FileHandle.standardError.write(Data(("FAIL "+description+"\n").utf8)); exit(1) }
@@ -50,6 +51,10 @@ func capture(_ w:NSWindow,_ path:URL) {
 func runIntegration(_ e:Workspace) {
     setlinebuf(stdout)
     checkSplitAppIcon()
+    let update = NSApp.mainMenu?.items.first?.submenu?.item(withTitle:"检查更新…")
+    check(update?.target is SPUStandardUpdaterController && update?.action == #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+          "application menu checks for updates through Sparkle")
+
     if let dir = ProcessInfo.processInfo.environment["FOLIO_TEST_SOURCE_DIR"] {
         runSourceFileTests(e,at:URL(fileURLWithPath:dir,isDirectory:true)); return
     }
@@ -638,18 +643,26 @@ func runIntegration(_ e:Workspace) {
         e.window.makeKeyAndOrderFront(nil)
         tree.scrollRowToVisible(index)
         e.window.contentView?.layoutSubtreeIfNeeded()
-        for clicks in 1...2 {
-            let rect = tree.rect(ofRow:index)
-            let point = tree.convert(NSPoint(x:rect.midX,y:rect.midY),to:nil)
-            let host = e.window.contentView!
-            check(host.hitTest(host.convert(point,from:nil))?.isDescendant(of:tree) == true,
-                  "test clicks a visible file row")
-            func treeEvent(_ type:NSEvent.EventType) -> NSEvent {
-                NSEvent.mouseEvent(with:type,location:point,modifierFlags:[],timestamp:ProcessInfo.processInfo.systemUptime,
-                    windowNumber:e.window.windowNumber,context:nil,eventNumber:clicks,clickCount:clicks,pressure:1)!
+        if NSApp.isActive && e.window.isKeyWindow {
+            for clicks in 1...2 {
+                let rect = tree.rect(ofRow:index)
+                let point = tree.convert(NSPoint(x:rect.midX,y:rect.midY),to:nil)
+                let host = e.window.contentView!
+                check(host.hitTest(host.convert(point,from:nil))?.isDescendant(of:tree) == true,
+                      "test clicks a visible file row")
+                func treeEvent(_ type:NSEvent.EventType) -> NSEvent {
+                    NSEvent.mouseEvent(with:type,location:point,modifierFlags:[],timestamp:ProcessInfo.processInfo.systemUptime,
+                        windowNumber:e.window.windowNumber,context:nil,eventNumber:clicks,clickCount:clicks,pressure:1)!
+                }
+                NSApp.postEvent(treeEvent(.leftMouseUp),atStart:true)
+                tree.mouseDown(with:treeEvent(.leftMouseDown))
             }
-            NSApp.postEvent(treeEvent(.leftMouseUp),atStart:true)
-            tree.mouseDown(with:treeEvent(.leftMouseDown))
+        } else {
+            // macOS can give another app focus while this window is running the integration suite.
+            // In that case validate the table's binding and exercise the same row action directly.
+            check(tree.target === e.tree && tree.doubleAction != nil && e.tree.doubleSelect != nil,
+                  "background window has the native table double-action binding")
+            e.tree.doubleSelect?(index)
         }
         check(e.previewTab == nil,"double-clicking a tree file pins its tab (row \(index), clicked \(tree.clickedRow), selected \(tree.selectedRow), preview \(e.previewTab?.title ?? "none"))")
         e.selectTree(sessionRow("session-a.swift"))
