@@ -23,3 +23,7 @@ xcuserdata/
 *.provisionprofile
 *.pem
 *.key
+
+# Python bytecode
+__pycache__/
+*.pyc

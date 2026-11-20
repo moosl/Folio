@@ -50,9 +50,24 @@ open dist/Folio.app
 
 ## 发布新版本
 
-1. 递增 `app/Info.plist` 中的 `CFBundleVersion`，并设置新的 `CFBundleShortVersionString`（如 `0.2.1`）。提交代码并推送对应的 Git 标签（如 `v0.2.1`）。
-2. 在发布 Mac 上配置 Developer ID Application 签名身份、已认证的 `asc` 和钥匙串里的 Sparkle 更新签名密钥。运行 `bash scripts/release.sh`，生成公证 ZIP 和签名的 `dist/appcast.xml`。
-3. 在同一 GitHub Release 草稿上传这两个文件，确认 ZIP 文件名与清单一致，再作为 **Latest** 发布。已安装的客户端会从固定入口取得最新清单。
+发布 Mac 需要 Apple Silicon、Xcode Command Line Tools、已登录的 `gh` 和 `asc`、OpenSSL 3+、Developer ID Application 证书和 Sparkle 钥匙串账户 `moosl.Folio.updates`。在该用户的图形登录会话中运行一次：
+
+```sh
+bash scripts/install-tag-publisher.sh
+```
+
+之后把改动推到 `main`，再推送稳定版本 tag 即可。以 `v0.2.1` 为例：
+
+```sh
+git tag -a v0.2.1 -m 'Folio 0.2.1'
+git push origin v0.2.1
+```
+
+本机 LaunchAgent 每五分钟检查一次远端，高于当前 Latest 的 `v主.次.补丁` 标签会按版本顺序处理。只构建已进入远端 `main` 历史的提交。正式包的版本取自 tag，内部构建号在上一份已签名更新清单的基础上递增。发布机睡眠或离线时会在恢复后补发，签名时需能访问登录钥匙串。
+
+发布程序在独立检出目录构建，签名、公证、装订票据，再用普通 ZIP 解压器解包并验证 Gatekeeper。ZIP 与已签名的 `appcast.xml` 在同一 Release 草稿中上传，远端摘要核对成功后一起设为 Latest。中断会在下轮重试；已完成的正式包可复用。私钥留在本机。
+
+查看状态：`launchctl print "gui/$(id -u)/local.folio.tag-publisher"`。发布日志位于 `~/Library/Application Support/FolioRelease/publisher.log`，每个版本的构建日志位于该目录下的 `jobs/<tag>/build.log`。更新发布程序后重新运行安装脚本。
 
 本项目的 Sparkle 公钥和更新地址在 `app/Info.plist`。分发自己的 fork 时，请换用自己的更新地址、公钥、签名密钥账户及发布仓库。私钥保存在发布者的钥匙串中。
 

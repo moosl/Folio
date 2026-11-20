@@ -16,6 +16,11 @@ bash scripts/build.sh
 stage=$(mktemp -d "${TMPDIR:-/tmp}/Folio-release.XXXXXXXX")
 bundle="$stage/Folio.app"
 ditto dist/Folio.app "$bundle"
+if [[ -n "${FOLIO_RELEASE_VERSION:-}" || -n "${FOLIO_RELEASE_BUILD:-}" ]]; then
+  [[ "${FOLIO_RELEASE_VERSION:-}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ && "${FOLIO_RELEASE_BUILD:-}" =~ ^[1-9][0-9]*$ ]] || exit 2
+  plutil -replace CFBundleShortVersionString -string "$FOLIO_RELEASE_VERSION" "$bundle/Contents/Info.plist"
+  plutil -replace CFBundleVersion -string "$FOLIO_RELEASE_BUILD" "$bundle/Contents/Info.plist"
+fi
 framework="$bundle/Contents/Frameworks/Sparkle.framework"
 sparkle="$framework/Versions/B"
 for helper in "$sparkle"/XPCServices/*.xpc "$sparkle/Autoupdate" "$sparkle/Updater.app"; do
@@ -26,7 +31,7 @@ for target in "$framework" "$bundle/Contents/Helpers/rg" "$bundle"; do
 done
 codesign --verify --deep --strict -R '=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists' "$bundle"
 
-ditto -c -k --keepParent "$bundle" "$stage/submit.zip"
+ditto -c -k --norsrc --noextattr --noacl --keepParent "$bundle" "$stage/submit.zip"
 for attempt in 1 2 3; do
   if asc notarization submit --file "$stage/submit.zip" --wait --timeout 72h --output table 2>"$stage/notary.err"; then
     break
@@ -44,8 +49,8 @@ spctl --assess --type execute --verbose=2 "$bundle"
 
 version=$(plutil -extract CFBundleShortVersionString raw "$bundle/Contents/Info.plist")
 archive="Folio-$version-macOS-$(uname -m).zip"
-ditto -c -k --keepParent "$bundle" "$stage/$archive"
-unzip -tq "$stage/$archive"
+ditto -c -k --norsrc --noextattr --noacl --keepParent "$bundle" "$stage/$archive"
+bash scripts/verify-release-zip.sh "$stage/$archive"
 updates="$stage/updates"
 mkdir "$updates"
 mv "$stage/$archive" "$updates/$archive"
