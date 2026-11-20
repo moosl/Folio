@@ -1,8 +1,10 @@
 # Folio
 
-**Folio 是一款轻量的 macOS 代码编辑器，适合主要用 Codex、Claude Code 等 AI agent 开发的人。**
+**Folio 是一款启动快、内存占用小的原生 macOS 代码编辑器，适合主要用 Codex、Claude Code 等 AI agent 开发的人。**
 
 agent 说「改好了」，你想看一眼它改的函数，搜搜哪里还在调用它；有时只是想读完一份 Markdown 实现计划。如果专门为这些事打开 VS Code 觉得太重，把项目文件夹拖进 Folio 就行。
+
+在 Apple M3（macOS 15.7.3）上，Folio 从启动到空窗口出现约 **0.23 秒**，此时主进程占用约 **20 MiB**（预热后独立启动 5 次的中位数）。在多标签测试中，同时打开 20 份共 77 MiB 的代码文件后，主进程占用约 **72 MiB**。[查看性能实测](PERFORMANCE.md)
 
 [下载 macOS 版 · Apple Silicon](https://github.com/moosl/Folio/releases/latest)
 
