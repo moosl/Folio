@@ -216,7 +216,8 @@ final class RowList: NSView, NSTableViewDataSource, NSTableViewDelegate {
         guard let row = rows.first, let url = dragFile?(row) else { return }
         draggedFile = (url,(url as NSURL).fileReferenceURL() as NSURL?)
     }
-    func tableView(_ tableView:NSTableView,validateDrop info:NSDraggingInfo,proposedRow row:Int,proposedDropOperation operation:NSTableView.DropOperation) -> NSDragOperation {
+    func tableView(_ tableView:NSTableView,validateDrop info:NSDraggingInfo,proposedRow proposed:Int,proposedDropOperation operation:NSTableView.DropOperation) -> NSDragOperation {
+        let row = table.row(at:table.convert(info.draggingLocation,from:nil))
         guard info.draggingSource as? NSTableView === table, let source = draggedFile?.url,
               dropFolder?(row,source) != nil else { return [] }
         table.setDropRow(row,dropOperation:.on)
@@ -259,6 +260,14 @@ final class SoftRow: NSTableRowView {
     override func drawSelection(in dirtyRect:NSRect) {
         Ink.wash.setFill()
         NSBezierPath(roundedRect:bounds.insetBy(dx:2,dy:1),xRadius:7,yRadius:7).fill()
+    }
+    override func drawDraggingDestinationFeedback(in dirtyRect:NSRect) {
+        let outline = NSBezierPath(roundedRect:bounds.insetBy(dx:7,dy:1.5),xRadius:7,yRadius:7)
+        Ink.accent.withAlphaComponent(0.26).setFill()
+        outline.fill()
+        Ink.accent.setStroke()
+        outline.lineWidth = 2
+        outline.stroke()
     }
     override var isEmphasized: Bool { get { false } set {} }
 }

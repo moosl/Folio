@@ -724,6 +724,18 @@ func runIntegration(_ e:Workspace) {
         e.selectTree(sessionRow("session-c.swift"))
         check(e.docs.count == 3 && edited.dirty && e.previewTab?.title == "session-c.swift","editing a preview keeps its draft when another file opens")
         let fileRow = sessionRow("session-a.swift"), notesRow = sessionRow("Notes")
+        tree.scrollRowToVisible(notesRow)
+        let targetRow = tree.rowView(atRow:notesRow,makeIfNecessary:true)!
+        func folderSnapshot() -> Data? {
+            let bitmap = targetRow.bitmapImageRepForCachingDisplay(in:targetRow.bounds)!
+            targetRow.cacheDisplay(in:targetRow.bounds,to:bitmap)
+            return bitmap.representation(using:.png,properties:[:])
+        }
+        let idleFolder = folderSnapshot()
+        targetRow.isTargetForDropOperation = true
+        check(idleFolder != nil && folderSnapshot() != idleFolder,"folder visibly highlights as a drag destination")
+        targetRow.isTargetForDropOperation = false
+        check(folderSnapshot() == idleFolder,"folder returns to its original appearance when drag leaves")
         let sourceURL = e.tree.dragFile?(fileRow)
         let folderURL = e.items[notesRow].0
         check(e.treeMenu(for:fileRow)?.item(withTitle:L("Reveal in Finder"))?.representedObject as? URL == sourceURL &&

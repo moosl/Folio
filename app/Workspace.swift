@@ -154,6 +154,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         fillRow(wrapped(section,NSEdgeInsets(top:20,left:16,bottom:8,right:16)),in:rail)
         fillRow(tree,in:rail)
         tree.table.contextMenuForRow = { [weak self] index in self?.treeMenu(for:index) }
+        tree.table.draggingDestinationFeedbackStyle = .regular
         tree.table.registerForDraggedTypes([RowList.sidebarFile])
         tree.table.setDraggingSourceOperationMask(.move,forLocal:true)
         tree.table.setDraggingSourceOperationMask([.copy,.move],forLocal:false)
