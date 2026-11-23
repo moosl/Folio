@@ -55,6 +55,16 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
     @objc func largerType() { editor.changeFontSize(by:1) }
     @objc func smallerType() { editor.changeFontSize(by:-1) }
+    @objc func findInFile(_ sender:NSMenuItem) {
+        guard editor.page == .edit, let buffer = editor.active as? Buffer else { return }
+        if buffer.markdown && buffer.mode == .preview {
+            buffer.mode = .split
+            editor.showEditor(buffer)
+        }
+        let source = buffer.source
+        editor.window.makeFirstResponder(source)
+        source.performTextFinderAction(sender)
+    }
     @objc func projectSearch() { editor.showProjectSearch() }
     @objc func quick() { editor.showQuickOpen() }
     @objc func preview() { editor.togglePreview() }
@@ -73,6 +83,9 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if changed { editor.refreshLanguage() }
     }
     func validateMenuItem(_ menuItem:NSMenuItem) -> Bool {
+        if menuItem.action == #selector(findInFile(_:)) {
+            return editor?.page == .edit && editor?.active is Buffer && NSApp.modalWindow == nil
+        }
         if [#selector(save), #selector(saveAs), #selector(largerType), #selector(smallerType)].contains(where:{ $0 == menuItem.action }) {
             return editor?.page == .edit && editor?.active is Buffer
         }
@@ -116,8 +129,14 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         for (name,sel,key) in [(L("Undo"),"undo:","z"),(L("Redo"),"redo:","Z"),(L("Cut"),"cut:","x"),(L("Copy"),"copy:","c"),(L("Paste"),"paste:","v"),(L("Select All"),"selectAll:","a")] {
             _ = item(e,name,NSSelectorFromString(sel),key.lowercased(),key=="Z" ? [.command,.shift] : .command)
         }
-        for (name,key,tag) in [(L("Find"),"f",NSTextFinder.Action.showFindInterface),(L("Find and Replace"),"h",.showReplaceInterface)] {
-            let i = item(e,name,#selector(NSTextView.performTextFinderAction(_:)),key,key=="h" ? [.command,.option] : .command); i.tag = tag.rawValue
+        let findActions: [(String,String,NSEvent.ModifierFlags,NSTextFinder.Action)] = [
+            (L("Find"),"f",.command,.showFindInterface),
+            (L("Find Next"),"g",.command,.nextMatch),
+            (L("Find Previous"),"G",[.command,.shift],.previousMatch),
+            (L("Find and Replace"),"h",[.command,.option],.showReplaceInterface)
+        ]
+        for (name,key,modifiers,action) in findActions {
+            item(e,name,#selector(findInFile(_:)),key,modifiers,self).tag = action.rawValue
         }
         let v = menu(L("View"))
         _ = item(v,L("Increase Text Size"),#selector(largerType),"+",.command,self)

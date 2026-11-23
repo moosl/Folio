@@ -250,19 +250,19 @@ func runIntegration(_ e:Workspace) {
         meta.querySelectorAll('.tags span').length === 2 && !meta.querySelector('b') && meta.nextElementSibling.textContent === '项目手册';
         """),"article header displays bold title, concise byline, summary and tags without YAML labels")
         let initialFont = md.fontSize
-        func fontShortcut(_ key:String,_ shift:Bool,_ keyCode:UInt16) -> Bool {
+        func menuShortcut(_ key:String,_ shift:Bool,_ keyCode:UInt16) -> Bool {
             let event = NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:shift ? [.command,.shift] : .command,
                 timestamp:ProcessInfo.processInfo.systemUptime,windowNumber:e.window.windowNumber,context:nil,
                 characters:key,charactersIgnoringModifiers:key,isARepeat:false,keyCode:keyCode)!
             return NSApp.mainMenu!.performKeyEquivalent(with:event)
         }
         check(!e.editorActions.arrangedSubviews.contains { $0.toolTip?.contains("文字") == true },"toolbar omits font-size buttons")
-        check(fontShortcut("+",true,24),"Command-plus invokes text zoom")
+        check(menuShortcut("+",true,24),"Command-plus invokes text zoom")
         check(md.source.font?.pointSize == initialFont+1 && !md.dirty &&
               spin { js(web,"parseFloat(getComputedStyle(document.body).fontSize)>15") },"font control enlarges source and preview without modifying the file")
         e.showEditor(blank); check(blank.fontSize == initialFont,"font sizes are independent per tab")
         e.showEditor(md); check(md.fontSize == initialFont+1,"tab remembers font size")
-        check(fontShortcut("-",false,27),"Command-minus invokes text zoom")
+        check(menuShortcut("-",false,27),"Command-minus invokes text zoom")
         check(spin { js(web,"parseFloat(getComputedStyle(document.body).fontSize)===15") },"minus restores preview font size")
         md.source.insertText("实时预览",replacementRange:NSRange(location:(md.source.string as NSString).length,length:0))
         check(spin { js(web,"document.querySelector('main').innerText.includes('实时预览')") },"live preview of unsaved edit")
@@ -271,6 +271,9 @@ func runIntegration(_ e:Workspace) {
         check(spin { js(web,"window.innerWidth >= "+String(Int(e.body.bounds.width)-2)) },"reading mode expands the WebKit viewport across the editor")
         capture(e.window,tmp.appendingPathComponent("article-preview.png"))
         e.togglePreview(); check(md.mode == .source && md.source.window != nil,"source only")
+        md.mode = .preview; e.showEditor(md)
+        check(menuShortcut("f",false,3) && spin { md.mode == .split && md.scroller.isFindBarVisible },
+              "Command-F opens document search from Markdown preview")
         e.open([file("Review.swift")])
         let source = e.active as! Buffer
         for offset in [-11, 0, 9] {
@@ -301,9 +304,41 @@ func runIntegration(_ e:Workspace) {
         let ink = source.source.layoutManager?.temporaryAttribute(.foregroundColor,atCharacterIndex:0,effectiveRange:nil) as? NSColor
         check(ink != nil && ink != Ink.text,"code keyword highlighting")
         let finder = NSMenuItem()
+        e.window.makeFirstResponder(e.tree.table)
+        check(menuShortcut("f",false,3) && spin { source.scroller.isFindBarVisible },
+              "Command-F opens the active file search with sidebar focus")
+        capture(e.window,tmp.appendingPathComponent("file-find.png"))
+        let queryEditor = e.window.firstResponder as? NSTextView
+        check(queryEditor?.isFieldEditor == true,"file search focuses its query field")
+        queryEditor?.selectAll(nil)
+        queryEditor?.insertText("e",replacementRange:NSRange(location:NSNotFound,length:0))
+        func matchLocation() -> Int? {
+            let range = source.source.selectedRange()
+            return range.length == 1 && (source.source.string as NSString).substring(with:range) == "e" ? range.location : nil
+        }
+        let handledFindNext = menuShortcut("g",false,5)
+        let matched = spin { matchLocation() != nil }
+        check(handledFindNext && matched,"Command-G selects matching text (handled \(handledFindNext), range \(source.source.selectedRange()), query \(queryEditor?.string ?? ""))")
+        let firstMatch = matchLocation()
+        check(menuShortcut("g",false,5) && spin { matchLocation() != nil && matchLocation() != firstMatch },
+              "Command-G advances to another occurrence")
+        let handledPrevious = menuShortcut("G",true,5)
+        check(handledPrevious && spin { matchLocation() == firstMatch },"Shift-Command-G returns to the previous occurrence (handled \(handledPrevious), expected \(firstMatch as Any), range \(source.source.selectedRange()))")
         finder.tag = NSTextFinder.Action.showReplaceInterface.rawValue
         source.source.performTextFinderAction(finder)
         check(spin { source.scroller.isFindBarVisible },"native find and replace bar")
+        if let bar = source.scroller.findBarView {
+            func editableFields(_ view:NSView) -> [NSTextField] {
+                if let field = view as? NSTextField, field.isEditable { return [field] }
+                return view.subviews.flatMap(editableFields)
+            }
+            check(spin {
+                let fields = editableFields(bar)
+                return fields.count == 2 && fields.allSatisfy {
+                    $0.font?.pointSize == 13 && bar.bounds.contains($0.convert($0.bounds,to:bar))
+                }
+            },"both styled search and replacement fields fit the expanded toolbar")
+        }
         finder.tag = NSTextFinder.Action.hideFindInterface.rawValue
         source.source.performTextFinderAction(finder)
         try write("Review.swift","let value = 7\n// needle\n")

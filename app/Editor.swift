@@ -7,6 +7,39 @@ final class SourceView: NSTextView {
     override func performTextFinderAction(_ sender:Any?) {
         usedFinder = true
         super.performTextFinderAction(sender)
+        if let item = sender as? NSMenuItem,
+           [NSTextFinder.Action.showFindInterface.rawValue,NSTextFinder.Action.showReplaceInterface.rawValue].contains(item.tag),
+           let bar = enclosingScrollView?.findBarView {
+            styleFindControls(in:bar)
+        }
+    }
+
+    // AppKit owns both rows and their actions, including search options and replacement.
+    private func styleFindControls(in view:NSView) {
+        if let field = view as? NSTextField, field.isEditable {
+            field.controlSize = .regular
+            field.font = .systemFont(ofSize:13)
+            field.textColor = Ink.text
+            field.backgroundColor = Ink.raised
+            field.bezelStyle = .roundedBezel
+        } else if let segments = view as? NSSegmentedControl {
+            segments.controlSize = .regular
+            segments.font = .systemFont(ofSize:12,weight:.medium)
+            for i in 0..<segments.segmentCount where segments.image(forSegment:i) != nil {
+                segments.setWidth(26,forSegment:i)
+            }
+        } else if let button = view as? NSButton {
+            button.controlSize = .regular
+            button.font = .systemFont(ofSize:12,weight:.medium)
+            if !button.title.isEmpty {
+                button.attributedTitle = NSAttributedString(string:button.title,attributes:[
+                    .foregroundColor:Ink.text,.font:NSFont.systemFont(ofSize:12,weight:.medium)
+                ])
+            }
+        } else {
+            if let row = view as? NSStackView, row.orientation == .horizontal { row.spacing = 8 }
+            for child in view.subviews { styleFindControls(in:child) }
+        }
     }
 
     override var undoManager: UndoManager? { history }

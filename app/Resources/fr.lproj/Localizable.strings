@@ -16,6 +16,8 @@
 "Copy" = "Copier";
 "Paste" = "Coller";
 "Select All" = "Tout sélectionner";
+"Find Next" = "Rechercher le suivant";
+"Find Previous" = "Rechercher le précédent";
 "Find" = "Rechercher";
 "Find and Replace" = "Rechercher et remplacer";
 "View" = "Présentation";

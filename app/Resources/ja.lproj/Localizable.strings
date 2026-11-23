@@ -16,6 +16,8 @@
 "Copy" = "コピー";
 "Paste" = "ペースト";
 "Select All" = "すべてを選択";
+"Find Next" = "次を検索";
+"Find Previous" = "前を検索";
 "Find" = "検索";
 "Find and Replace" = "検索と置換";
 "View" = "表示";
