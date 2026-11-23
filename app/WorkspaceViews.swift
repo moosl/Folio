@@ -179,6 +179,12 @@ final class RowList: NSView, NSTableViewDataSource, NSTableViewDelegate {
     var doubleSelect: ((Int)->Void)? {
         didSet { table.doubleAction = doubleSelect == nil ? nil : #selector(doubleClicked) }
     }
+    static let sidebarFile = NSPasteboard.PasteboardType("local.folio.sidebar-file")
+    var dragFile: ((Int)->URL?)?
+    var dropFolder: ((Int,URL)->URL?)?
+    var moveFile: ((URL,URL)->Bool)?
+    var externalMove: ((URL,URL)->Void)?
+    private var draggedFile: (url:URL, reference:NSURL?)?
     var deferSingleClick = false
     private var pendingClick: DispatchWorkItem?
     init(rowHeight:CGFloat) {
@@ -199,6 +205,36 @@ final class RowList: NSView, NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView:NSTableView) -> Int { count }
     func tableView(_ tableView:NSTableView,rowViewForRow row:Int) -> NSTableRowView? { SoftRow() }
     func tableView(_ tableView:NSTableView,viewFor tableColumn:NSTableColumn?,row index:Int) -> NSView? { row?(index) }
+    func tableView(_ tableView:NSTableView,pasteboardWriterForRow row:Int) -> NSPasteboardWriting? {
+        guard let url = dragFile?(row) else { return nil }
+        let item = NSPasteboardItem()
+        item.setString(url.absoluteString,forType:.fileURL)
+        item.setString(url.absoluteString,forType:Self.sidebarFile)
+        return item
+    }
+    func tableView(_ tableView:NSTableView,draggingSession session:NSDraggingSession,willBeginAt point:NSPoint,forRowIndexes rows:IndexSet) {
+        guard let row = rows.first, let url = dragFile?(row) else { return }
+        draggedFile = (url,(url as NSURL).fileReferenceURL() as NSURL?)
+    }
+    func tableView(_ tableView:NSTableView,validateDrop info:NSDraggingInfo,proposedRow row:Int,proposedDropOperation operation:NSTableView.DropOperation) -> NSDragOperation {
+        guard info.draggingSource as? NSTableView === table, let source = draggedFile?.url,
+              dropFolder?(row,source) != nil else { return [] }
+        table.setDropRow(row,dropOperation:.on)
+        return .move
+    }
+    func tableView(_ tableView:NSTableView,acceptDrop info:NSDraggingInfo,row:Int,dropOperation:NSTableView.DropOperation) -> Bool {
+        guard info.draggingSource as? NSTableView === table, let source = draggedFile?.url,
+              let folder = dropFolder?(row,source) else { return false }
+        let moved = moveFile?(source,folder) == true
+        if moved { draggedFile = nil }
+        return moved
+    }
+    func tableView(_ tableView:NSTableView,draggingSession session:NSDraggingSession,endedAt point:NSPoint,operation:NSDragOperation) {
+        defer { draggedFile = nil }
+        guard operation.contains(.move), let file = draggedFile, let destination = file.reference?.filePathURL,
+              destination.path != file.url.path else { return }
+        externalMove?(file.url,destination)
+    }
     @objc func clicked() {
         let i = table.clickedRow
         guard (0..<count).contains(i) else { return }
@@ -230,7 +266,7 @@ final class DropView: NSView {
     var open: (([URL])->Void)?
     override init(frame:NSRect) { super.init(frame:frame); registerForDraggedTypes([.fileURL]) }
     required init?(coder:NSCoder) { fatalError() }
-    override func draggingEntered(_ sender:NSDraggingInfo) -> NSDragOperation { .copy }
+    override func draggingEntered(_ sender:NSDraggingInfo) -> NSDragOperation { sender.draggingSource is RowTable ? [] : .copy }
     override func performDragOperation(_ sender:NSDraggingInfo) -> Bool {
         let urls = sender.draggingPasteboard.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL] ?? []
         open?(urls); return !urls.isEmpty

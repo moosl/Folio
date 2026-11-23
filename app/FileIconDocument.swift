@@ -2,7 +2,8 @@ import AppKit
 import UniformTypeIdentifiers
 
 final class FileIconDocument: WorkspaceDocument {
-    let location: URL
+    private(set) var location: URL
+    func relocate(to url:URL) { location = url }
     var url: URL? { location }
     var title: String { location.lastPathComponent }
     let dirty = false

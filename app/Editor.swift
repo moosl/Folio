@@ -99,6 +99,7 @@ private final class EditorViews {
 enum ReadMode: Int { case source, split, preview }
 final class Buffer: NSObject, NSTextViewDelegate, NSTextStorageDelegate, WorkspaceDocument {
     var url: URL?
+    func relocate(to url:URL) { self.url = url }
     private let untitledNumber: Int
     var untitled: String { untitledNumber <= 1 ? L("Untitled") : L("Untitled %ld",untitledNumber) }
     var title: String { url?.lastPathComponent ?? untitled }

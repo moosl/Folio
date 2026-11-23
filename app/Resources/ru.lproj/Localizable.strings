@@ -50,6 +50,7 @@
 "Add Project Folder" = "Добавить папку проекта";
 "New File (⌘N)" = "Новый файл (⌘N)";
 "Open File (⌘O)" = "Открыть файл (⌘O)";
+"Reveal in Finder" = "Показать в Finder";
 "Copy File Path" = "Скопировать путь к файлу";
 "Remove Project" = "Убрать проект из списка";
 "Delete Project" = "Удалить проект";

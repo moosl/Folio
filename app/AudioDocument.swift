@@ -2,7 +2,8 @@ import AppKit
 import AVFoundation
 
 final class AudioDocument: NSObject, WorkspaceDocument, AVAudioPlayerDelegate {
-    let location: URL
+    private(set) var location: URL
+    func relocate(to url:URL) { location = url }
     var url: URL? { location }
     var title: String { location.lastPathComponent }
     let dirty = false

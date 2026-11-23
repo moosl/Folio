@@ -723,6 +723,26 @@ func runIntegration(_ e:Workspace) {
         edited.source.insertText("// note\n",replacementRange:NSRange(location:0,length:0))
         e.selectTree(sessionRow("session-c.swift"))
         check(e.docs.count == 3 && edited.dirty && e.previewTab?.title == "session-c.swift","editing a preview keeps its draft when another file opens")
+        let fileRow = sessionRow("session-a.swift"), notesRow = sessionRow("Notes")
+        let sourceURL = e.tree.dragFile?(fileRow)
+        let folderURL = e.items[notesRow].0
+        check(e.treeMenu(for:fileRow)?.item(withTitle:L("Reveal in Finder"))?.representedObject as? URL == sourceURL &&
+              rootMenu.item(withTitle:L("Reveal in Finder")) != nil,"Finder action targets the clicked file or project")
+        let writer = e.tree.tableView(tree,pasteboardWriterForRow:fileRow) as? NSPasteboardItem
+        check(writer?.string(forType:.fileURL) == sourceURL?.absoluteString,"sidebar drag exports a Finder file URL")
+        let draggedBytes = try Data(contentsOf:sourceURL!)
+        check(e.tree.dropFolder?(notesRow,sourceURL!) == folderURL && e.tree.moveFile?(sourceURL!,folderURL) == true,
+              "sidebar accepts a file drop on a folder")
+        let moved = folderURL.appendingPathComponent("session-a.swift")
+        let movedBytes = try Data(contentsOf:moved)
+        check(edited.url?.path == moved.path && edited.dirty && movedBytes == draggedBytes &&
+              !FileManager.default.fileExists(atPath:sourceURL!.path),"moving keeps unsaved edits and relocates the disk file")
+        check(e.tree.dropFolder?(sessionRow("Notes"),moved) == nil,"same-folder drop rejected")
+        try draggedBytes.write(to:sourceURL!,options:.withoutOverwriting)
+        let projectRow = e.items.firstIndex { $0.0.path == tmp.path }!
+        check(e.tree.dropFolder?(projectRow,moved) == nil,"drop cannot replace an existing file")
+        try FileManager.default.removeItem(at:sourceURL!)
+        check(e.tree.moveFile?(moved,e.items[projectRow].0) == true,"file can move back to the project root")
         try edited.save(to:file("session-a.swift"),expected:edited.baseline)
         let notes = file("Notes")
         let create = e.treeMenu(for:sessionRow("Notes"))!.item(withTitle:L("New File"))!

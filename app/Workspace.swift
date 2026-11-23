@@ -154,6 +154,30 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         fillRow(wrapped(section,NSEdgeInsets(top:20,left:16,bottom:8,right:16)),in:rail)
         fillRow(tree,in:rail)
         tree.table.contextMenuForRow = { [weak self] index in self?.treeMenu(for:index) }
+        tree.table.registerForDraggedTypes([RowList.sidebarFile])
+        tree.table.setDraggingSourceOperationMask(.move,forLocal:true)
+        tree.table.setDraggingSourceOperationMask([.copy,.move],forLocal:false)
+        tree.dragFile = { [weak self] index in
+            guard let self, self.items.indices.contains(index), !self.items[index].0.hasDirectoryPath else { return nil }
+            return self.items[index].0
+        }
+        tree.dropFolder = { [weak self] index,source in
+            guard let self, self.items.indices.contains(index) else { return nil }
+            let dir = self.items[index].0
+            guard dir.hasDirectoryPath, dir.path != source.deletingLastPathComponent().path,
+                  !FileManager.default.fileExists(atPath:dir.appendingPathComponent(source.lastPathComponent).path) else { return nil }
+            return dir
+        }
+        tree.moveFile = { [weak self] source,dir in
+            guard let self else { return false }
+            let target = dir.appendingPathComponent(source.lastPathComponent,isDirectory:false)
+            do { try FileManager.default.moveItem(at:source,to:target) }
+            catch { self.alert(error.localizedDescription); return false }
+            self.expanded.insert(dir)
+            self.didMoveFile(source,to:target)
+            return true
+        }
+        tree.externalMove = { [weak self] source,target in self?.didMoveFile(source,to:target) }
         tree.row = { [weak self] i in self?.treeRow(i) ?? NSView() }
         tree.select = { [weak self] i in self?.selectTree(i) }
         tree.doubleSelect = { [weak self] i in
@@ -238,6 +262,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             entry.target = self; entry.representedObject = url
         }
         if url.hasDirectoryPath { addCreationItems(to:menu,in:url) }
+        item(L("Reveal in Finder"),#selector(revealTreeItem(_:)))
         item(L("Copy File Path"),#selector(copyTreePath(_:)))
         menu.addItem(.separator())
         if level == 0 {
@@ -295,6 +320,23 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
             (doc as? Buffer)?.mode = .source
             showEditor(doc)
         }
+    }
+    private func didMoveFile(_ source:URL,to target:URL) {
+        if let doc = docs.first(where:{ $0.url?.path == source.path }) {
+            doc.relocate(to:target.standardizedFileURL.resolvingSymlinksInPath())
+            doc.reconcile()
+        }
+        childCache.removeAll()
+        treeDirty = true
+        switch page {
+        case .edit: if let active { showEditor(active) }
+        case .browse: showBrowse(folder)
+        case .quick,.find: rebuildTree(); updateWatches(); runSearch()
+        }
+    }
+    @objc private func revealTreeItem(_ sender:NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
     @objc private func copyTreePath(_ sender:NSMenuItem) {
         guard let url = sender.representedObject as? URL else { return }

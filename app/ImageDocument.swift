@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 protocol WorkspaceDocument: AnyObject {
     var url: URL? { get }
+    func relocate(to url:URL)
     var title: String { get }
     var dirty: Bool { get }
     func reconcile()
@@ -23,7 +24,8 @@ final class FittedImageView: NSImageView {
 }
 
 final class ImageDocument: WorkspaceDocument {
-    let location: URL
+    private(set) var location: URL
+    func relocate(to url:URL) { location = url }
     var url: URL? { location }
     var title: String { location.lastPathComponent }
     let dirty = false

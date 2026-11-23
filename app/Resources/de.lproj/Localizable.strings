@@ -50,6 +50,7 @@
 "Add Project Folder" = "Projektordner hinzufügen";
 "New File (⌘N)" = "Neue Datei (⌘N)";
 "Open File (⌘O)" = "Datei öffnen (⌘O)";
+"Reveal in Finder" = "Im Finder anzeigen";
 "Copy File Path" = "Dateipfad kopieren";
 "Remove Project" = "Projekt entfernen";
 "Delete Project" = "Projekt löschen";

@@ -50,6 +50,7 @@
 "Add Project Folder" = "加入專案資料夾";
 "New File (⌘N)" = "新增檔案 (⌘N)";
 "Open File (⌘O)" = "打開檔案 (⌘O)";
+"Reveal in Finder" = "在 Finder 中顯示";
 "Copy File Path" = "複製檔案路徑";
 "Remove Project" = "移除專案";
 "Delete Project" = "刪除專案";
