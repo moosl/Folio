@@ -16,6 +16,11 @@
 "Copy" = "Copia";
 "Paste" = "Incolla";
 "Select All" = "Seleziona tutto";
+"Select Next Occurrence" = "Seleziona occorrenza successiva";
+"Select All Occurrences" = "Seleziona tutte le occorrenze";
+"Select Line" = "Seleziona riga";
+"PDF Preview" = "Anteprima PDF";
+"Unable to read PDF" = "Impossibile leggere il PDF";
 "Find Next" = "Trova successivo";
 "Find Previous" = "Trova precedente";
 "Find" = "Trova";

@@ -16,6 +16,11 @@
 "Copy" = "Copy";
 "Paste" = "Paste";
 "Select All" = "Select All";
+"Select Next Occurrence" = "Select Next Occurrence";
+"Select All Occurrences" = "Select All Occurrences";
+"Select Line" = "Select Line";
+"PDF Preview" = "PDF Preview";
+"Unable to read PDF" = "Unable to read PDF";
 "Find Next" = "Find Next";
 "Find Previous" = "Find Previous";
 "Find" = "Find";

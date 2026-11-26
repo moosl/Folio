@@ -3,6 +3,7 @@ import CryptoKit
 
 final class SourceView: NSTextView {
     let history = UndoManager()
+    private var typingCarets = [NSRange]()
     private(set) var usedFinder = false
     override func performTextFinderAction(_ sender:Any?) {
         usedFinder = true
@@ -43,10 +44,141 @@ final class SourceView: NSTextView {
     }
 
     override var undoManager: UndoManager? { history }
+    override func setSelectedRanges(_ ranges:[NSValue],affinity:NSSelectionAffinity,stillSelecting:Bool) {
+        if !typingCarets.isEmpty { typingCarets.removeAll(); needsDisplay = true }
+        super.setSelectedRanges(ranges,affinity:affinity,stillSelecting:stillSelecting)
+    }
+    override func resignFirstResponder() -> Bool {
+        typingCarets.removeAll(); needsDisplay = true
+        return super.resignFirstResponder()
+    }
+    override func didChangeText() {
+        typingCarets.removeAll()
+        super.didChangeText()
+    }
+    override func draw(_ dirtyRect:NSRect) {
+        super.draw(dirtyRect)
+        guard !typingCarets.isEmpty, let window, let layoutManager, let textContainer else { return }
+        let area = dirtyRect.offsetBy(dx:-textContainerOrigin.x,dy:-textContainerOrigin.y)
+        let glyphs = layoutManager.glyphRange(forBoundingRect:area,in:textContainer)
+        let visible = layoutManager.characterRange(forGlyphRange:glyphs,actualGlyphRange:nil)
+        insertionPointColor.setFill()
+        for caret in typingCarets.dropFirst() {
+            if caret.location < visible.location { continue }
+            if caret.location > NSMaxRange(visible) { break }
+            let screenRect = firstRect(forCharacterRange:caret,actualRange:nil)
+            var rect = convert(window.convertFromScreen(screenRect),from:nil)
+            rect.size.width = 1.5
+            if dirtyRect.intersects(rect) { rect.fill() }
+        }
+    }
+
+    @discardableResult private func replaceSelections(with text:String,deleteBackward:Bool? = nil) -> Bool {
+        guard !hasMarkedText(), let storage = textStorage else { return false }
+        var ranges = typingCarets.isEmpty ? selectedRanges.map(\.rangeValue) : typingCarets
+        guard ranges.count > 1 else { return false }
+        let ns = storage.mutableString
+        if let backward = deleteBackward {
+            ranges = ranges.map { range in
+                let index = backward ? range.location-1 : range.location
+                return range.length == 0 && index >= 0 && index < ns.length ? ns.rangeOfComposedCharacterSequence(at:index) : range
+            }
+        }
+        let values = ranges.map(NSValue.init(range:))
+        guard shouldChangeText(inRanges:values,replacementStrings:Array(repeating:text,count:ranges.count)) else { return true }
+        storage.beginEditing()
+        for range in ranges.reversed() { storage.replaceCharacters(in:range,with:text) }
+        storage.endEditing()
+        var delta = 0, carets = [NSRange]()
+        let length = (text as NSString).length
+        for range in ranges {
+            let caret = NSRange(location:range.location+delta+length,length:0)
+            if carets.last != caret { carets.append(caret) }
+            delta += length-range.length
+        }
+        setSelectedRange(carets[0]); didChangeText()
+        typingCarets = carets.count > 1 ? carets : []
+        needsDisplay = true
+        return true
+    }
+    override func insertText(_ string:Any,replacementRange:NSRange) {
+        let text = (string as? NSAttributedString)?.string ?? string as? String
+        if replacementRange.location == NSNotFound || replacementRange == selectedRange(),
+           let text, replaceSelections(with:text) { return }
+        super.insertText(string,replacementRange:replacementRange)
+    }
+    override func paste(_ sender:Any?) {
+        if let text = NSPasteboard.general.string(forType:.string), replaceSelections(with:text) { return }
+        super.paste(sender)
+    }
+    override func deleteBackward(_ sender:Any?) {
+        if !replaceSelections(with:"",deleteBackward:true) { super.deleteBackward(sender) }
+    }
+    override func deleteForward(_ sender:Any?) {
+        if !replaceSelections(with:"",deleteBackward:false) { super.deleteForward(sender) }
+    }
+    override func cancelOperation(_ sender:Any?) {
+        if !typingCarets.isEmpty || selectedRanges.count > 1 {
+            setSelectedRange(NSRange(location:NSMaxRange(selectedRange()),length:0))
+        } else { super.cancelOperation(sender) }
+    }
+    @objc func selectNextOccurrence(_ sender:Any?) { selectOccurrences(all:false) }
+    @objc func selectAllOccurrences(_ sender:Any?) { selectOccurrences(all:true) }
+
+    private func selectOccurrences(all:Bool) {
+        guard !hasMarkedText(), let storage = textStorage, storage.length > 0 else { return }
+        let text = storage.mutableString
+        var ranges = selectedRanges.map(\.rangeValue)
+        guard var seed = ranges.first else { return }
+        if seed.length == 0 {
+            let caret = seed.location
+            let wordCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn:"_"))
+            func word(at index:Int) -> NSRange? {
+                guard index >= 0 && index < text.length else { return nil }
+                let range = storage.doubleClick(at:index)
+                return text.rangeOfCharacter(from:wordCharacters,options:[],range:range).location == NSNotFound ? nil : range
+            }
+            guard let wordRange = word(at:caret) ?? word(at:caret-1) else { return }
+            seed = wordRange
+            ranges = [seed]
+            if !all { setSelectedRange(seed); return }
+        }
+        let needle = text.substring(with:seed)
+        guard ranges.allSatisfy({ $0.length == seed.length && text.substring(with:$0) == needle }) else { return }
+        let wholeWord = storage.doubleClick(at:seed.location) == seed
+        var additions = [NSRange]()
+        func collect(from start:Int,to end:Int) {
+            var cursor = start
+            while cursor < end {
+                let match = text.range(of:needle,options:.literal,range:NSRange(location:cursor,length:end-cursor))
+                guard match.location != NSNotFound else { break }
+                if !wholeWord || storage.doubleClick(at:match.location) == match {
+                    additions.append(match)
+                    if !all { return }
+                }
+                cursor = NSMaxRange(match)
+            }
+        }
+        collect(from:NSMaxRange(ranges.last!),to:text.length)
+        var start = 0
+        for range in ranges where all || additions.isEmpty {
+            collect(from:start,to:range.location)
+            start = NSMaxRange(range)
+        }
+        guard all || !additions.isEmpty else { return }
+        selectedRanges = (ranges + additions).sorted { $0.location < $1.location }.map(NSValue.init(range:))
+        scrollRangeToVisible(all ? seed : additions.last ?? seed)
+    }
+
+    @objc func selectCurrentLine(_ sender:Any?) {
+        guard !hasMarkedText() else { return }
+        setSelectedRange((string as NSString).lineRange(for:selectedRange()))
+    }
     override func insertNewline(_ sender: Any?) {
         let ns = string as NSString
         let line = ns.substring(with: ns.lineRange(for: NSRange(location: selectedRange().location, length: 0)))
         let indent = String(line.prefix { $0 == " " || $0 == "\t" })
+        if replaceSelections(with:"\n"+indent) { return }
         super.insertNewline(sender)
         if !indent.isEmpty { insertText(indent, replacementRange: selectedRange()) }
     }

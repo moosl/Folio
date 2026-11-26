@@ -15,7 +15,7 @@ final class FileIconDocument: WorkspaceDocument {
         guard let type = UTType(filenameExtension:url.pathExtension), !type.conforms(to:.text) else { return false }
         // Other type identifiers can be ambiguous: .ts is also used for MPEG transport streams.
         // Let the text reader inspect those files before falling back to their icon.
-        return type.conforms(to:.pdf) || type.conforms(to:.archive)
+        return type.conforms(to:.archive)
     }
 
     func makeView() -> NSView {

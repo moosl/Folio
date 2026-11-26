@@ -129,6 +129,10 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         for (name,sel,key) in [(L("Undo"),"undo:","z"),(L("Redo"),"redo:","Z"),(L("Cut"),"cut:","x"),(L("Copy"),"copy:","c"),(L("Paste"),"paste:","v"),(L("Select All"),"selectAll:","a")] {
             _ = item(e,name,NSSelectorFromString(sel),key.lowercased(),key=="Z" ? [.command,.shift] : .command)
         }
+        e.addItem(.separator())
+        _ = item(e,L("Select Next Occurrence"),#selector(SourceView.selectNextOccurrence(_:)),"d")
+        _ = item(e,L("Select All Occurrences"),#selector(SourceView.selectAllOccurrences(_:)),"L",[.command,.shift])
+        _ = item(e,L("Select Line"),#selector(SourceView.selectCurrentLine(_:)),"l")
         let findActions: [(String,String,NSEvent.ModifierFlags,NSTextFinder.Action)] = [
             (L("Find"),"f",.command,.showFindInterface),
             (L("Find Next"),"g",.command,.nextMatch),

@@ -470,7 +470,9 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         let b: WorkspaceDocument
         let audio = u.pathExtension.lowercased() == "mp3", image = ImageDocument.supports(u)
         do {
-            if audio {
+            if u.pathExtension.lowercased() == "pdf" {
+                b = PDFPreviewDocument(u)
+            } else if audio {
                 b = try AudioDocument(u)
             } else if image {
                 b = try ImageDocument(u)
@@ -583,6 +585,8 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         window.isDocumentEdited = docs.contains { $0.dirty }
         if page == .edit, let audio = active as? AudioDocument {
             status.stringValue = audio.status; rightStatus.stringValue = "MP3"
+        } else if page == .edit, let pdf = active as? PDFPreviewDocument {
+            status.stringValue = pdf.status; rightStatus.stringValue = "PDF"
         } else if page == .edit, active is FileIconDocument {
             status.stringValue = ""; rightStatus.stringValue = ""
         } else if page == .edit, let image = active as? ImageDocument {
@@ -599,6 +603,7 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
     private func deactivateDocument() {
         (active as? Buffer)?.releaseInactiveEditor()
         (active as? ImageDocument)?.hide()
+        (active as? PDFPreviewDocument)?.hide()
         (active as? AudioDocument)?.hide()
     }
 
@@ -722,7 +727,11 @@ final class Workspace: NSObject, NSWindowDelegate, NSSearchFieldDelegate {
         #endif
     }
     private func mountDocument(_ document:WorkspaceDocument,line jump:Int?) {
-        if let file = document as? FileIconDocument {
+        if let pdf = document as? PDFPreviewDocument {
+            conflictBar = nil; body.pin(pdf.view)
+            body.layoutSubtreeIfNeeded(); pdf.show()
+            window.makeFirstResponder(pdf.view)
+        } else if let file = document as? FileIconDocument {
             conflictBar = nil; body.pin(file.makeView(),margins(16,16)); window.makeFirstResponder(nil)
         } else if let audio = document as? AudioDocument {
             audio.show()

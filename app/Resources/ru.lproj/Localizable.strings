@@ -16,6 +16,11 @@
 "Copy" = "Копировать";
 "Paste" = "Вставить";
 "Select All" = "Выбрать всё";
+"Select Next Occurrence" = "Выделить следующее совпадение";
+"Select All Occurrences" = "Выделить все совпадения";
+"Select Line" = "Выделить строку";
+"PDF Preview" = "Просмотр PDF";
+"Unable to read PDF" = "Не удалось прочитать PDF";
 "Find Next" = "Найти далее";
 "Find Previous" = "Найти ранее";
 "Find" = "Найти";

@@ -16,6 +16,11 @@
 "Copy" = "复制";
 "Paste" = "粘贴";
 "Select All" = "全选";
+"Select Next Occurrence" = "选中下一个匹配项";
+"Select All Occurrences" = "选中所有匹配项";
+"Select Line" = "选中当前行";
+"PDF Preview" = "PDF 预览";
+"Unable to read PDF" = "无法读取 PDF";
 "Find Next" = "查找下一个";
 "Find Previous" = "查找上一个";
 "Find" = "查找";

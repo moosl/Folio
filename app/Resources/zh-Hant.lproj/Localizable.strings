@@ -16,6 +16,11 @@
 "Copy" = "複製";
 "Paste" = "貼上";
 "Select All" = "全選";
+"Select Next Occurrence" = "選取下一個相符項目";
+"Select All Occurrences" = "選取所有相符項目";
+"Select Line" = "選取目前行";
+"PDF Preview" = "PDF 預覽";
+"Unable to read PDF" = "無法讀取 PDF";
 "Find Next" = "尋找下一個";
 "Find Previous" = "尋找上一個";
 "Find" = "尋找";

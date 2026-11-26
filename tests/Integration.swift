@@ -1,5 +1,6 @@
 import Cocoa
 import WebKit
+import PDFKit
 import Sparkle
 
 private func check(_ ok:@autoclosure ()->Bool,_ description:String) {
@@ -158,6 +159,31 @@ func runIntegration(_ e:Workspace) {
         e.newBuffer()
         let blank = e.active as! Buffer
         check(blank.url == nil && blank.source.string.isEmpty,"new untitled tab")
+        func verifySelections(_ source:SourceView) {
+            let repeated = "🧭 foo foo_bar FOO\nfoo foo"
+            source.insertText(repeated,replacementRange:source.selectedRange())
+            let lastFoo = (repeated as NSString).range(of:"foo",options:.backwards)
+            source.setSelectedRange(NSRange(location:lastFoo.location+1,length:0))
+            check(menuShortcut("d",false,2) && source.selectedRange() == lastFoo,"Command-D selects the word at the caret")
+            check(menuShortcut("d",false,2) && source.selectedRanges.count == 2 && source.selectedRange().location == 3,"Command-D adds the next word across EOF")
+            check(menuShortcut("L",true,37) && source.selectedRanges.count == 3,"Shift-Command-L selects remaining whole-word matches only")
+            source.breakUndoCoalescing(); source.undoManager?.removeAllActions()
+            source.insertText("b",replacementRange:NSRange(location:NSNotFound,length:0))
+            source.insertText("ar",replacementRange:NSRange(location:NSNotFound,length:0))
+            check(source.string == "🧭 bar foo_bar FOO\nbar bar","successive keystrokes replace all selected occurrences")
+            source.breakUndoCoalescing(); source.undoManager?.undo()
+            check(source.string == repeated,"one undo restores a multi-selection edit")
+            source.setSelectedRange(lastFoo)
+            check(menuShortcut("l",false,37) && (source.string as NSString).substring(with:source.selectedRange()) == "foo foo","Command-L selects the current line")
+            source.setSelectedRange(NSRange(location:6,length:0))
+            check(menuShortcut("d",false,2) && source.selectedRange() == NSRange(location:3,length:3),"Command-D recognizes a caret immediately after the word")
+            _ = menuShortcut("d",false,2)
+            source.cancelOperation(nil)
+            source.insertText("!",replacementRange:NSRange(location:NSNotFound,length:0))
+            check(source.string == "🧭 foo! foo_bar FOO\nfoo foo","Escape returns to single-caret input")
+            source.selectAll(nil); source.deleteBackward(nil)
+        }
+        verifySelections(blank.source)
         blank.source.insertText("    func example()",replacementRange:NSRange(location:0,length:0))
         blank.source.insertNewline(nil)
         check(blank.source.string.hasSuffix("\n    ") && blank.dirty,"native text input, indentation and dirty state")
@@ -439,8 +465,7 @@ func runIntegration(_ e:Workspace) {
             return rep.representation(using:type,properties:[:])!
         }
         let imageURL = file("picture.png")
-        for (name,data) in [("archive.zip",Data([0x50,0x4b,0,0])),("unknown.folio-fixture",Data([0,255,1])),
-                            ("sample.pdf",Data("%PDF-1.4\n%%EOF".utf8))] {
+        for (name,data) in [("archive.zip",Data([0x50,0x4b,0,0])),("unknown.folio-fixture",Data([0,255,1]))] {
             try data.write(to:file(name))
             e.showBrowse(tmp)
             check(spin { e.items.contains { $0.0.lastPathComponent == name } },"unsupported file appears in sidebar")
@@ -452,6 +477,23 @@ func runIntegration(_ e:Workspace) {
                   (icon?.bounds.width ?? 0) >= 128 && title?.stringValue == name && !e.saveActive(),
                   "sidebar opens read-only icon and filename for "+name)
         }
+        let pdfURL = file("two-pages.PDF")
+        let fixture = PDFDocument()
+        for index in 0..<2 { fixture.insert(PDFPage(image:NSImage(data:bitmap(36+index))!)!,at:index) }
+        let pdfBytes = fixture.dataRepresentation()!
+        try pdfBytes.write(to:pdfURL)
+        e.showBrowse(tmp)
+        check(spin { e.items.contains { $0.0 == pdfURL } },"PDF appears in sidebar")
+        e.selectTree(e.items.firstIndex { $0.0 == pdfURL }!)
+        let pdf = e.active as! PDFPreviewDocument
+        check(pdf.view.window === e.window && pdf.view.document?.pageCount == 2 && !e.saveActive(),"sidebar opens both PDF pages in a read-only viewer")
+        pdf.view.goToLastPage(nil)
+        e.showBrowse(tmp); e.open([pdfURL])
+        check(e.active === pdf && pdf.view.currentPage === pdf.view.document?.page(at:1),"reopening PDF reuses tab and restores page")
+        try Data("invalid".utf8).write(to:pdfURL,options:.atomic)
+        check(spin { pdf.view.document == nil && e.status.stringValue == L("Unable to read PDF") },"damaged PDF does not retain stale pages")
+        try pdfBytes.write(to:pdfURL,options:.atomic)
+        check(spin { pdf.view.document?.pageCount == 2 },"PDF viewer recovers after disk replacement")
         let firstImage = bitmap(36)
         try firstImage.write(to:imageURL)
         e.showBrowse(tmp)

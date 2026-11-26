@@ -16,6 +16,11 @@
 "Copy" = "コピー";
 "Paste" = "ペースト";
 "Select All" = "すべてを選択";
+"Select Next Occurrence" = "次の一致を選択";
+"Select All Occurrences" = "すべての一致を選択";
+"Select Line" = "行を選択";
+"PDF Preview" = "PDFプレビュー";
+"Unable to read PDF" = "PDFを読み込めません";
 "Find Next" = "次を検索";
 "Find Previous" = "前を検索";
 "Find" = "検索";

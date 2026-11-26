@@ -16,5 +16,5 @@
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
-<key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>public.text</string><string>public.source-code</string><string>public.folder</string><string>public.json</string><string>net.daringfireball.markdown</string></array></dict><dict><key>CFBundleTypeRole</key><string>Viewer</string><key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>public.image</string><string>public.mp3</string></array></dict></array>
+<key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>public.text</string><string>public.source-code</string><string>public.folder</string><string>public.json</string><string>net.daringfireball.markdown</string></array></dict><dict><key>CFBundleTypeRole</key><string>Viewer</string><key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>public.image</string><string>com.adobe.pdf</string><string>public.mp3</string></array></dict></array>
 </dict></plist>

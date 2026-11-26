@@ -16,6 +16,11 @@
 "Copy" = "Copiar";
 "Paste" = "Pegar";
 "Select All" = "Seleccionar todo";
+"Select Next Occurrence" = "Seleccionar la siguiente coincidencia";
+"Select All Occurrences" = "Seleccionar todas las coincidencias";
+"Select Line" = "Seleccionar línea";
+"PDF Preview" = "Vista previa de PDF";
+"Unable to read PDF" = "No se puede leer el PDF";
 "Find Next" = "Buscar siguiente";
 "Find Previous" = "Buscar anterior";
 "Find" = "Buscar";

@@ -16,6 +16,11 @@
 "Copy" = "복사";
 "Paste" = "붙여넣기";
 "Select All" = "모두 선택";
+"Select Next Occurrence" = "다음 일치 항목 선택";
+"Select All Occurrences" = "모든 일치 항목 선택";
+"Select Line" = "현재 줄 선택";
+"PDF Preview" = "PDF 미리보기";
+"Unable to read PDF" = "PDF를 읽을 수 없음";
 "Find Next" = "다음 찾기";
 "Find Previous" = "이전 찾기";
 "Find" = "찾기";

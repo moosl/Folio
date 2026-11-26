@@ -116,7 +116,7 @@ if [[ "${1:-}" == "--store" ]]; then
   plutil -replace CFBundleIdentifier -string "${FOLIO_STORE_BUNDLE_ID:-io.github.moosl.Folio}" "$app/Info.plist"
   plutil -insert LSApplicationCategoryType -string public.app-category.developer-tools "$app/Info.plist"
   plutil -insert CFBundleDocumentTypes.0.CFBundleTypeName -string "Text and project documents" "$app/Info.plist"
-  plutil -insert CFBundleDocumentTypes.1.CFBundleTypeName -string "Images and audio" "$app/Info.plist"
+  plutil -insert CFBundleDocumentTypes.1.CFBundleTypeName -string "Images, audio and PDF" "$app/Info.plist"
   plutil -insert ITSAppUsesNonExemptEncryption -bool NO "$app/Info.plist"
   plutil -replace CFBundleVersion -string "${FOLIO_STORE_BUILD:-7}" "$app/Info.plist"
   signer=${FOLIO_STORE_APP_IDENTITY:--}
