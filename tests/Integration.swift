@@ -171,8 +171,9 @@ func runIntegration(_ e:Workspace) {
             source.insertText("b",replacementRange:NSRange(location:NSNotFound,length:0))
             source.insertText("ar",replacementRange:NSRange(location:NSNotFound,length:0))
             check(source.string == "🧭 bar foo_bar FOO\nbar bar","successive keystrokes replace all selected occurrences")
-            source.breakUndoCoalescing(); source.undoManager?.undo()
-            check(source.string == repeated,"one undo restores a multi-selection edit")
+            check(menuShortcut("z",false,6) && source.string == repeated,"Command-Z undoes a multi-selection edit")
+            check(menuShortcut("Z",true,6) && source.string == "🧭 bar foo_bar FOO\nbar bar","Shift-Command-Z redoes the edit")
+            check(menuShortcut("z",false,6) && source.string == repeated,"Command-Z works again after redo")
             source.setSelectedRange(lastFoo)
             check(menuShortcut("l",false,37) && (source.string as NSString).substring(with:source.selectedRange()) == "foo foo","Command-L selects the current line")
             source.setSelectedRange(NSRange(location:6,length:0))
@@ -324,8 +325,8 @@ func runIntegration(_ e:Workspace) {
         source.source.insertText("draft",replacementRange:initialSelection)
         source.source.breakUndoCoalescing()
         e.showEditor(blank); e.showEditor(source)
-        source.source.history.undo()
-        check(source.source.string.hasPrefix("let value") && !source.dirty,"independent undo after tab switch")
+        check(menuShortcut("z",false,6) && source.source.string.hasPrefix("let value") && !source.dirty,
+              "Command-Z uses the current tab history after switching tabs")
         source.refreshColors()
         let ink = source.source.layoutManager?.temporaryAttribute(.foregroundColor,atCharacterIndex:0,effectiveRange:nil) as? NSColor
         check(ink != nil && ink != Ink.text,"code keyword highlighting")

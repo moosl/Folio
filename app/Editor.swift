@@ -44,6 +44,18 @@ final class SourceView: NSTextView {
     }
 
     override var undoManager: UndoManager? { history }
+    @objc func undo(_ sender:Any?) {
+        breakUndoCoalescing()
+        if history.canUndo { history.undo() }
+    }
+    @objc func redo(_ sender:Any?) {
+        if history.canRedo { history.redo() }
+    }
+    override func validateMenuItem(_ item:NSMenuItem) -> Bool {
+        if item.action == #selector(undo(_:)) { return history.canUndo }
+        if item.action == #selector(redo(_:)) { return history.canRedo }
+        return super.validateMenuItem(item)
+    }
     override func setSelectedRanges(_ ranges:[NSValue],affinity:NSSelectionAffinity,stillSelecting:Bool) {
         if !typingCarets.isEmpty { typingCarets.removeAll(); needsDisplay = true }
         super.setSelectedRanges(ranges,affinity:affinity,stillSelecting:stillSelecting)

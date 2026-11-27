@@ -127,7 +127,7 @@ final class Application: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         _ = item(f,L("Close Tab"),#selector(closeTab),"w",.command,self)
         let e = menu(L("Edit"))
         for (name,sel,key) in [(L("Undo"),"undo:","z"),(L("Redo"),"redo:","Z"),(L("Cut"),"cut:","x"),(L("Copy"),"copy:","c"),(L("Paste"),"paste:","v"),(L("Select All"),"selectAll:","a")] {
-            _ = item(e,name,NSSelectorFromString(sel),key.lowercased(),key=="Z" ? [.command,.shift] : .command)
+            _ = item(e,name,NSSelectorFromString(sel),key,key=="Z" ? [.command,.shift] : .command)
         }
         e.addItem(.separator())
         _ = item(e,L("Select Next Occurrence"),#selector(SourceView.selectNextOccurrence(_:)),"d")
